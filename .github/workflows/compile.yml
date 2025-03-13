@@ -28,19 +28,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ["ubuntu-20.04", "ubuntu-22.04", "ubuntu-24.04"]
-        nginx_version: ["1.25.4", "1.25.5", "1.26.2", "1.27.2"]
+        os: ["ubuntu-22.04", "ubuntu-24.04", "ubuntu-22.04-arm", "ubuntu-24.04-arm"]
+        nginx_version: ["1.22.1", "1.23.4", "1.24.0", "1.25.4", "1.25.5", "1.26.2", "1.27.4"]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: "master"
-      - name: Setup
-        run: |
-          sudo apt-get update
-          sudo apt-get -y install build-essential make
-      - name: Compile module
+          fetch-depth: 0
+      
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+          java-package: "jre"
+      
+      - name: Compile Nginx
         id: compile
         run: |
           export COSMETIC_DIR=$(pwd)
@@ -51,31 +55,343 @@ jobs:
           chmod +x configure
           ./configure --add-module=$COSMETIC_DIR --with-stream --with-debug --without-http --with-pcre --with-ld-opt="-lstdc++"
           make
-      - name: Compile mcping
+      
+      - name: Setup mcping
+        if: ${{ !endsWith(matrix.os, 'arm') }}
         working-directory: ${{ steps.compile.outputs.cosmetic_dir }}
-        env:
-          MCPING_REPO: ${{ secrets.MCPING_REPO }}
         run: |
-          cd ${{ steps.compile.outputs.cosmetic_dir }}
-          git clone "$MCPING_REPO"
-          cd mcping
-          make
+          wget --no-verbose -O "mcping" "https://github.com/NetherRealmSpigot/mcping/releases/download/v0.0.1/mcping-0.0.1-linux-amd64"
+          chmod +x ./mcping
+
+      - name: Setup go
+        if: ${{ endsWith(matrix.os, 'arm') }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: "^1.23"
+      
+      - name: Setup mcping
+        if: ${{ endsWith(matrix.os, 'arm') }}
+        working-directory: ${{ steps.compile.outputs.cosmetic_dir }}
+        run: |
+          git clone https://github.com/NetherRealmSpigot/mcping.git mcping-src
+          cd mcping-src
+          make build
+          cp mcping ../
           cd ..
-          mv mcping/mcping mcping-exec
-          rm -rf mcping
-          mv mcping-exec mcping
-          chmod +x mcping
-      - name: Setup Nginx config
+          rm -rf mcping-src
+          chmod +x ./mcping
+      
+      - name: Setup PaperSpigot
         working-directory: ${{ steps.compile.outputs.cosmetic_dir }}
         run: |
-          cd ${{ steps.compile.outputs.cosmetic_dir }}
+          mkdir -p spigot
+          cd spigot
+          
+          curl -o paper.jar -fsSL https://api.papermc.io/v2/projects/paper/versions/1.21.3/builds/82/downloads/paper-1.21.3-82.jar
+          
+          mkdir -p plugins
+          curl -o plugins/viaversion.jar -fsSL https://github.com/ViaVersion/ViaVersion/releases/download/5.2.1/ViaVersion-5.2.1.jar
+
+          cat << EOF > bukkit.yml
+          settings:
+            allow-end: false
+            warn-on-overload: true
+            permissions-file: permissions.yml
+            update-folder: update
+            plugin-profiling: false
+            connection-throttle: 4000
+            query-plugins: true
+            deprecated-verbose: default
+            shutdown-message: Server closed
+            minimum-api: none
+            use-map-color-cache: true
+          spawn-limits:
+            monsters: 70
+            animals: 10
+            water-animals: 5
+            water-ambient: 20
+            water-underground-creature: 5
+            axolotls: 5
+            ambient: 15
+          chunk-gc:
+            period-in-ticks: 600
+          ticks-per:
+            animal-spawns: 400
+            monster-spawns: 1
+            water-spawns: 1
+            water-ambient-spawns: 1
+            water-underground-creature-spawns: 1
+            axolotl-spawns: 1
+            ambient-spawns: 1
+            autosave: 6000
+          aliases: now-in-commands.yml
+          EOF
+
+          cat << EOF > commands.yml
+          command-block-overrides: []
+          ignore-vanilla-permissions: false
+          aliases:
+            icanhasbukkit:
+            - version $1-
+          EOF
+
+          cat << EOF > eula.txt
+          eula=true
+          EOF
+
+          cat << EOF > spigot.yml
+          messages:
+            whitelist: You are not whitelisted on this server!
+            unknown-command: Unknown command. Type "/help" for help.
+            server-full: The server is full!
+            outdated-client: Outdated client! Please use {0}
+            outdated-server: Outdated server! I'm still on {0}
+            restart: Server is restarting
+          advancements:
+            disable-saving: true
+            disabled:
+            - minecraft:story/disabled
+          settings:
+            bungeecord: false
+            save-user-cache-on-stop-only: false
+            sample-count: 0
+            player-shuffle: 0
+            user-cache-size: 1000
+            moved-wrongly-threshold: 0.0625
+            moved-too-quickly-multiplier: 10.0
+            timeout-time: 60
+            restart-on-crash: false
+            restart-script: ./start.sh
+            netty-threads: 4
+            attribute:
+              maxAbsorption:
+                max: 2048.0
+              maxHealth:
+                max: 2048.0
+              movementSpeed:
+                max: 2048.0
+              attackDamage:
+                max: 2048.0
+            log-villager-deaths: true
+            log-named-deaths: true
+            debug: false
+          commands:
+            tab-complete: 0
+            send-namespaced: true
+            log: true
+            spam-exclusions:
+            - /skill
+            silent-commandblock-console: false
+            replace-commands:
+            - setblock
+            - summon
+            - testforblock
+            - tellraw
+          world-settings:
+            default:
+              below-zero-generation-in-existing-chunks: true
+              view-distance: default
+              simulation-distance: default
+              thunder-chance: 100000
+              merge-radius:
+                item: 0.5
+                exp: -1.0
+              mob-spawn-range: 8
+              item-despawn-rate: 6000
+              arrow-despawn-rate: 1200
+              trident-despawn-rate: 1200
+              zombie-aggressive-towards-villager: true
+              nerf-spawner-mobs: false
+              enable-zombie-pigmen-portal-spawns: true
+              wither-spawn-sound-radius: 0
+              end-portal-sound-radius: 0
+              hanging-tick-frequency: 100
+              unload-frozen-chunks: false
+              growth:
+                cactus-modifier: 100
+                cane-modifier: 100
+                melon-modifier: 100
+                mushroom-modifier: 100
+                pumpkin-modifier: 100
+                sapling-modifier: 100
+                beetroot-modifier: 100
+                carrot-modifier: 100
+                potato-modifier: 100
+                torchflower-modifier: 100
+                wheat-modifier: 100
+                netherwart-modifier: 100
+                vine-modifier: 100
+                cocoa-modifier: 100
+                bamboo-modifier: 100
+                sweetberry-modifier: 100
+                kelp-modifier: 100
+                twistingvines-modifier: 100
+                weepingvines-modifier: 100
+                cavevines-modifier: 100
+                glowberry-modifier: 100
+                pitcherplant-modifier: 100
+              entity-activation-range:
+                animals: 32
+                monsters: 32
+                raiders: 64
+                misc: 16
+                water: 16
+                villagers: 32
+                flying-monsters: 32
+                wake-up-inactive:
+                  animals-max-per-tick: 4
+                  animals-every: 1200
+                  animals-for: 100
+                  monsters-max-per-tick: 8
+                  monsters-every: 400
+                  monsters-for: 100
+                  villagers-max-per-tick: 4
+                  villagers-every: 600
+                  villagers-for: 100
+                  flying-monsters-max-per-tick: 8
+                  flying-monsters-every: 200
+                  flying-monsters-for: 100
+                villagers-work-immunity-after: 100
+                villagers-work-immunity-for: 20
+                villagers-active-for-panic: true
+                tick-inactive-villagers: true
+                ignore-spectators: false
+              entity-tracking-range:
+                players: 128
+                animals: 96
+                monsters: 96
+                misc: 96
+                display: 128
+                other: 64
+              ticks-per:
+                hopper-transfer: 8
+                hopper-check: 1
+              hopper-amount: 1
+              hopper-can-load-chunks: false
+              dragon-death-sound-radius: 0
+              seed-village: 10387312
+              seed-desert: 14357617
+              seed-igloo: 14357618
+              seed-jungle: 14357619
+              seed-swamp: 14357620
+              seed-monument: 10387313
+              seed-shipwreck: 165745295
+              seed-ocean: 14357621
+              seed-outpost: 165745296
+              seed-endcity: 10387313
+              seed-slime: 987234911
+              seed-nether: 30084232
+              seed-mansion: 10387319
+              seed-fossil: 14357921
+              seed-portal: 34222645
+              seed-ancientcity: 20083232
+              seed-trailruins: 83469867
+              seed-trialchambers: 94251327
+              seed-buriedtreasure: 10387320
+              seed-mineshaft: default
+              seed-stronghold: default
+              hunger:
+                jump-walk-exhaustion: 0.05
+                jump-sprint-exhaustion: 0.2
+                combat-exhaustion: 0.1
+                regen-exhaustion: 6.0
+                swim-multiplier: 0.01
+                sprint-multiplier: 0.1
+                other-multiplier: 0.0
+              max-tnt-per-tick: 100
+              max-tick-time:
+                tile: 50
+                entity: 50
+              verbose: false
+          players:
+            disable-saving: true
+          config-version: 12
+          stats:
+            disable-saving: true
+            forced-stats: {}
+          EOF
+
+          cat << EOF > server.properties
+          accepts-transfers=false
+          allow-flight=false
+          allow-nether=false
+          broadcast-console-to-ops=true
+          broadcast-rcon-to-ops=true
+          bug-report-link=
+          debug=false
+          difficulty=normal
+          enable-command-block=false
+          enable-jmx-monitoring=false
+          enable-query=false
+          enable-rcon=false
+          enable-status=true
+          enforce-secure-profile=false
+          enforce-whitelist=false
+          entity-broadcast-range-percentage=100
+          force-gamemode=false
+          function-permission-level=2
+          gamemode=survival
+          generate-structures=false
+          generator-settings={}
+          hardcore=false
+          hide-online-players=true
+          initial-disabled-packs=
+          initial-enabled-packs=vanilla
+          level-name=world
+          level-seed=
+          level-type=minecraft\:superflat
+          log-ips=true
+          max-chained-neighbor-updates=1000000
+          max-players=2
+          max-tick-time=60000
+          max-world-size=29999984
+          motd=A Minecraft Server
+          network-compression-threshold=256
+          online-mode=false
+          op-permission-level=4
+          pause-when-empty-seconds=60
+          player-idle-timeout=0
+          prevent-proxy-connections=false
+          pvp=true
+          query.port=25565
+          rate-limit=0
+          rcon.password=
+          rcon.port=25575
+          region-file-compression=deflate
+          require-resource-pack=false
+          resource-pack=
+          resource-pack-id=
+          resource-pack-prompt=
+          resource-pack-sha1=
+          server-ip=127.0.0.1
+          server-port=25567
+          simulation-distance=2
+          spawn-monsters=false
+          spawn-protection=1
+          sync-chunk-writes=true
+          text-filtering-config=
+          text-filtering-version=0
+          use-native-transport=true
+          view-distance=4
+          white-list=false
+          EOF
+
+          nohup java -jar paper.jar nogui 2>&1 &
+
+        continue-on-error: false
+      
+      - name: Setup Nginx
+        working-directory: ${{ steps.compile.outputs.cosmetic_dir }}
+        run: |
           cd nginx-${{ matrix.nginx_version }}
+          
           mkdir -p logs
           touch logs/access.log
           touch logs/error.log
+          
           cat << EOF > conf/nginx.conf
-          user  root;
-          worker_processes  1;
+          master_process  off;
+          worker_processes  auto;
 
           error_log   logs/error.log  debug;
 
@@ -86,46 +402,69 @@ jobs:
           stream {
               resolver 1.1.1.1 8.8.8.8 ipv6=off valid=60s;
 
-              minecraft_server_hostname  127.0.0.1  mc.hypixel.net;
-              minecraft_server_hostname  localhost  mc.hypixel.net;
-              minecraft_server_hostname  ilovecatgirls.xyz  mc.hypixel.net;
+              minecraft_server_hostname  127.0.0.1  test;
+              minecraft_server_hostname  localhost  test;
+              
               minecraft_server_hostname_replace_on_ping  on;
               minecraft_server_hostname_disconnect_on_nomatch  off;
+              
               server {
                   listen 25565;
-                  proxy_pass  mc.hypixel.net:25565;
+                  proxy_pass  127.0.0.1:25567;
                   minecraft_server_forward on;
               }
           }
           EOF
+          
           chmod +x objs/nginx
           objs/nginx -V
           objs/nginx -p $(pwd) -t
           objs/nginx -p $(pwd) -g "daemon on;"
-      - name: Test pinging
+      
+      - name: Run
         working-directory: ${{ steps.compile.outputs.cosmetic_dir }}
         run: |
-          cd ${{ steps.compile.outputs.cosmetic_dir }}
+          protocol_numbers=(
+            763 764 765 766 767 768 769
+            755 756 757 758 759 760 761 762
+            573 575 578 735 736 751 753 754
+            393 401 404 477 480 485 490 498
+            210 315 316 335 338 340
+            47 107 108 109 110
+          )
+          
           export PING_QUERY_COUNT=60
           export PING_QUERY_ROUNDWAIT=2
+          
           declare -i max_query_count=$PING_QUERY_COUNT
           declare -i i_count=0
-          while [ $i_count -le $max_query_count ]; do
-            i_count+=1
-            if ./mcping --host 127.0.0.1 --protocol 763; then
-              break;
-            elif [[ $i_count -eq $max_query_count ]]; then
-              echo "PING FAILURE."
-              exit 1;
-            fi
-            sleep $PING_QUERY_ROUNDWAIT
+          
+          for protocol_i in "${protocol_numbers[@]}"; do
+            i_count=0
+            echo $protocol_i
+            while [ $i_count -le $max_query_count ]; do
+              i_count+=1
+              if ./mcping --host 127.0.0.1 --protocol $protocol_i; then
+                break;
+              elif [[ $i_count -eq $max_query_count ]]; then
+                echo "PING FAILURE."
+                exit 1;
+              fi
+              echo "Retrying"
+              sleep $PING_QUERY_ROUNDWAIT
+            done
           done
+      
       - name: Upload artifacts
-        uses: CrimsonEdgeHope/upload-artifact-action@81f940d004763f986ba3582c007fd842dd5cb0d7
+        uses: actions/upload-artifact@v4
         if: ${{ always() }}
         with:
           name: ${{ github.run_id }}-${{ matrix.os }}-nginx-${{ matrix.nginx_version }}
-          path: ${{ steps.compile.outputs.cosmetic_dir }}/nginx-${{ matrix.nginx_version }}
-          retention-days: 3
+          path: |
+            ${{ steps.compile.outputs.cosmetic_dir }}/nginx-${{ matrix.nginx_version }}
+            ${{ steps.compile.outputs.cosmetic_dir }}/spigot/config
+            ${{ steps.compile.outputs.cosmetic_dir }}/spigot/crash-reports
+            ${{ steps.compile.outputs.cosmetic_dir }}/spigot/logs
+          retention-days: 1
           overwrite: true
         continue-on-error: true
