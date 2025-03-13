@@ -8,7 +8,8 @@ extern "C"
 #include <ngx_stream.h>
 }
 
-#include "../protocol/nsmfm_packet.hpp"
+#define _MC_UUID_LITERAL_LEN_ 32  // Without dashes.
+#define _MC_UUID_BYTE_LEN_ (_MC_UUID_LITERAL_LEN_ / 2)
 
 class MinecraftUUID {
 public:

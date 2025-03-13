@@ -1,7 +1,7 @@
 #ifndef _NSMFPM_STREAM_SESSION_CONTEXT_
 #define _NSMFPM_STREAM_SESSION_CONTEXT_
 
-#include "../protocol/nsmfm_packet.hpp"
+#include "../packet/nsmfm_packet.hpp"
 
 extern "C"
 {

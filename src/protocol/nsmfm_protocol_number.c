@@ -1,6 +1,6 @@
 #include "nsmfm_protocol_number.h"
 
-ngx_int_t nsmfm_is_known_protocol(int var) {
+int nsmfm_is_known_protocol(int var) {
     switch (var) {
         case MINECRAFT_1_21_4:
         case MINECRAFT_1_21_3:

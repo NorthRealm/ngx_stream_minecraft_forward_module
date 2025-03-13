@@ -4,11 +4,10 @@ extern "C"
 #include <ngx_stream.h>
 #include "../main/ngx_stream_minecraft_forward_module.h"
 #include "../protocol/nsmfm_protocol_number.h"
-#include "../utils/nsmfm_hostname.h"
 #include "../filter/nsmfcfm_session.h"
 }
 #include "nsmfpm_session.hpp"
-#include "../protocol/nsmfm_packet.hpp"
+#include "../packet/nsmfm_packet.hpp"
 #include "../protocol/nsmfm_varint.hpp"
 
 static ngx_int_t nsmfpm_post_init(ngx_conf_t *cf);

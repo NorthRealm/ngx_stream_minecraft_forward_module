@@ -5,15 +5,12 @@ extern "C"
 #include <ngx_hash.h>
 #include <ngx_stream.h>
 #include "ngx_stream_minecraft_forward_module.h"
-#include "../utils/nsmfm_hostname.h"
 }
 
 static void *nsmfm_create_srv_conf(ngx_conf_t *cf);
 static char *nsmfm_merge_srv_conf(ngx_conf_t *cf, void *prev, void *conf);
 
 static char *nsmfm_srv_conf_minecraft_server_hostname(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
-
-static ngx_int_t nsmfm_pre_init(ngx_conf_t *cf);
 
 #define _NGX_STREAM_MC_FORWARD_MODULE_DEFAULT_HASH_MAX_SIZE_ 512
 #define _NGX_STREAM_MC_FORWARD_MODULE_DEFAULT_HASH_BUCKET_SIZE_ 64
@@ -59,7 +56,7 @@ static ngx_command_t nsmfm_directives[] = {
 };
 
 static ngx_stream_module_t nsmfm_conf_ctx = {
-    nsmfm_pre_init,  /* preconfiguration */
+    NULL, /* preconfiguration */
     NULL, /* postconfiguration */
 
     NULL, /* create main configuration */
@@ -131,22 +128,6 @@ static char *nsmfm_srv_conf_minecraft_server_hostname(ngx_conf_t *cf, ngx_comman
     key = &values[1];
     val = &values[2];
 
-    if (cf->args->nelts >= 3 + 1) {
-        if (ngx_strcmp(values[3].data, "arbitrary") == 0) {
-            goto conf_validation_pass;
-        }
-    }
-
-    if (nsmfm_validate_hostname(key) != NGX_OK) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "Invalid entry: %V", key);
-        return (char *)NGX_CONF_ERROR;
-    }
-    if (nsmfm_validate_hostname(val) != NGX_OK) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "Invalid value: %V", key);
-        return (char *)NGX_CONF_ERROR;
-    }
-
-conf_validation_pass:
     rc = ngx_hash_add_key(&sc->hostname_map_keys, key, val, NGX_HASH_READONLY_KEY);
     if (rc != NGX_OK) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -199,6 +180,7 @@ static char *nsmfm_merge_srv_conf(ngx_conf_t *cf, void *prev, void *conf) {
     }
 
     // MERGE HASH TABLE
+    // TODO: Can it be improved further?
     for (ngx_uint_t i = 0; i < pconf->hostname_map_keys.keys.nelts; ++i) {
         key = &((ngx_hash_key_t *)pconf->hostname_map_keys.keys.elts + i)->key;
 
@@ -235,8 +217,4 @@ static char *nsmfm_merge_srv_conf(ngx_conf_t *cf, void *prev, void *conf) {
     }
 
     return (char *)NGX_CONF_OK;
-}
-
-static ngx_int_t nsmfm_pre_init(ngx_conf_t *cf) {
-    return nsmfm_init_hostname_regex(cf);
 }

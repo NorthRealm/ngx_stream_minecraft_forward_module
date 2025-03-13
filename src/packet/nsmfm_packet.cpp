@@ -4,9 +4,9 @@ extern "C"
 #include "../protocol/nsmfm_protocol_number.h"
 }
 #include "nsmfm_packet.hpp"
-#include "nsmfm_varint.hpp"
+#include "../protocol/nsmfm_varint.hpp"
 #include "../preread/nsmfpm_session.hpp"
-#include "../utils/nsmfm_uuid.hpp"
+#include "../protocol/nsmfm_uuid.hpp"
 
 /*
  Get string length from prefixed varint. Will move `*bufpos`.

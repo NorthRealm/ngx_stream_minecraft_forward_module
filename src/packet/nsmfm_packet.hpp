@@ -10,9 +10,6 @@ extern "C"
 
 #define _MC_PORT_LEN_ sizeof(u_short)
 
-#define _MC_UUID_LITERAL_LEN_ 32  // Without dashes.
-#define _MC_UUID_BYTE_LEN_ (_MC_UUID_LITERAL_LEN_ / 2)
-
 #define _MC_HANDSHAKE_PACKET_ID_         0x00
 #define _MC_HANDSHAKE_STATUS_STATE_      1
 #define _MC_HANDSHAKE_LOGINSTART_STATE_  2

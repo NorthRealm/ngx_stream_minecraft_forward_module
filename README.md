@@ -1,6 +1,6 @@
 # Nginx Stream Module ngx_stream_minecraft_forward_module
 
-`ngx_stream_minecraft_forward_module` module is an Nginx module that's able to explicitly sieve Minecraft Java game traffic.
+`ngx_stream_minecraft_forward_module` module is an Nginx module that can sieve Minecraft Java game traffic.
 
 ## Features
 
@@ -9,7 +9,7 @@
 > [!IMPORTANT]
 > - This module relies on [stream module](https://nginx.org/en/docs/stream/ngx_stream_core_module.html).
 > - Only suitable for Minecraft Java protocol since Netty rewrite.
-> - This module uses C++. Add `--with-ld-opt="-lstdc++"` whilst compiling Nginx.
+> - This module uses C++11. Add `--with-ld-opt="-lstdc++"` whilst compiling Nginx.
 
 ## Directives
 
@@ -24,13 +24,11 @@
 
 <hr/>
 
-- Syntax: `minecraft_server_hostname  hostname.to.be.replaced  new.hostname  [arbitrary];` <br/>
+- Syntax: `minecraft_server_hostname  hostname.to.be.replaced  new.hostname;` <br/>
   Default: None <br/>
   Context: stream, server <br/>
 
   When a client starts logging process, replace client-provided server hostname with a new hostname before proxying to remote Minecraft server.
-
-  If Nginx is compiled with PCRE, the module applies a simple validation against `hostname.to.be.replaced` and `new.hostname`. Set `arbitrary` option to bypass the validation.
 
 > [!TIP]
 > Due to differences in Minecraft Java protocol specification, should there be a SRV record `_minecraft._tcp.a.domain.for.example.com` that points to `another.domain.for.example.com`, consider define two replacements:
@@ -70,4 +68,4 @@ minecraft_server_hostname  another.domain.for.example.com  new.domain.for.exampl
   Default: `minecraft_server_hostname_replace_on_ping  on;` <br/>
   Context: stream, server <br/>
 
-  When a client starts pinging, replace client-provided server hostname with a new hostname before proxying to remote Minecraft server. This option is recommended pinging servers behind third-party services (e.g. TCPShield.com) that impose inspection on pinging packets.
+  When a client starts pinging, replace client-provided server hostname with a new hostname before proxying to remote Minecraft server. This option is recommended pinging servers hidden behind third-party services (e.g. TCPShield.com) that impose inspection on pinging packets.

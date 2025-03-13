@@ -1,13 +1,11 @@
 /*
  Reference to modern Minecraft Java protocol.
 
- https://wiki.vg
+ https://minecraft.wiki/w/Minecraft_Wiki:Projects/wiki.vg_merge/Protocol_version_numbers
 */
 
 #ifndef _NSMFM_MINECRAFT_JAVA_PROTOCOL_NUMBER_
 #define _NSMFM_MINECRAFT_JAVA_PROTOCOL_NUMBER_
-
-#include <ngx_core.h>
 
 #define MINECRAFT_1_8   47
 #define MINECRAFT_1_8_1 47
@@ -86,6 +84,6 @@
 #define MINECRAFT_1_21_3 768
 #define MINECRAFT_1_21_4 769
 
-ngx_int_t nsmfm_is_known_protocol(int var);
+int nsmfm_is_known_protocol(int var);
 
 #endif
