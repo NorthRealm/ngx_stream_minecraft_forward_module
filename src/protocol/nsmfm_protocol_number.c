@@ -2,6 +2,7 @@
 
 ngx_int_t nsmfm_is_known_protocol(int var) {
     switch (var) {
+        case MINECRAFT_1_21_4:
         case MINECRAFT_1_21_3:
         case MINECRAFT_1_21_1:
         case MINECRAFT_1_20_6:
