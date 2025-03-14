@@ -192,7 +192,7 @@ cannot_read_server_address_string:
         ngx_log_error(NGX_LOG_ALERT, c->log, 0, "Cannot read hostname");
         return NGX_ERROR;
     }
-    handshake->server_address->determine_content(s, bufpos, buflast);
+    rc = handshake->server_address->determine_content(s, bufpos, buflast);
     if (rc != NGX_OK) {
         goto cannot_read_server_address_string;
     }
@@ -273,7 +273,7 @@ cannot_read_username_string:
         ngx_log_error(NGX_LOG_ALERT, c->log, 0, "Cannot read username");
         return NGX_ERROR;
     }
-    loginstart->username->determine_content(s, bufpos, buflast);
+    rc = loginstart->username->determine_content(s, bufpos, buflast);
     if (rc != NGX_OK) {
         goto cannot_read_username_string;
     }
@@ -286,6 +286,12 @@ cannot_read_username_string:
     loginstart->uuid->length = MinecraftVarint::create(_MC_UUID_BYTE_LEN_);
     if (parse_var >= MINECRAFT_1_19_3) {
         if (parse_var <= MINECRAFT_1_20_1) {
+            if (!(*bufpos[0])) {
+                (*bufpos)++;
+                delete loginstart->uuid;
+                loginstart->uuid = nullptr;
+                goto end_of_loginstart;
+            }
             (*bufpos)++;
         }
         rc = loginstart->uuid->determine_content(s, bufpos, buflast);
@@ -301,6 +307,8 @@ cannot_read_username_string:
         delete uuid;
         uuid = nullptr;
     }
+
+end_of_loginstart:
     ctx->bufpos = *bufpos;
 
     return NGX_OK;
