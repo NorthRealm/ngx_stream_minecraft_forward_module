@@ -66,14 +66,11 @@ static ngx_int_t nsmfpm(ngx_stream_session_t *s) {
         return NGX_AGAIN;
     }
 
-    ctx = nsmfpm_get_session_context(s);
-    if (ctx == NULL) {
-        if (!nsmfpm_create_session_context(s)) {
-            return NGX_ERROR;
-        }
-        ctx = nsmfpm_get_session_context(s);
-        ctx->handler = nsmfpm_handshake;
+    if (!nsmfpm_create_session_context(s)) {
+        return NGX_ERROR;
     }
+    ctx = nsmfpm_get_session_context(s);
+    ctx->handler = nsmfpm_handshake;
 
     if (ctx->pass) {
         rc = NGX_OK;
@@ -256,6 +253,7 @@ static ngx_int_t nsmfpm_loginstart(ngx_stream_session_t *s) {
     c->log->action = (char *) "prereading minecraft loginstart packet";
 
     ctx = (nsmfpm_session_context *) nsmfpm_get_session_context(s);
+
     if (!nsmfcfm_create_session_context(s)) {
         return NGX_ERROR;
     }
