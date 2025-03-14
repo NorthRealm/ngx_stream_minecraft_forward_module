@@ -15,7 +15,7 @@ ngx_stream_filter_pt  ngx_stream_next_filter;
 
 static MinecraftString *nsmfm_get_new_hostname(nsmfm_srv_conf_t *sconf, u_char *buf, size_t len);
 
-static ngx_int_t nsmfm_content_filter(ngx_stream_session_t *s, ngx_chain_t *chain_in, ngx_uint_t from_upstream);
+static ngx_int_t nsmfcfm(ngx_stream_session_t *s, ngx_chain_t *chain_in, ngx_uint_t from_upstream);
 static ngx_int_t nsmfm_client_content_filter(ngx_stream_session_t *s, ngx_chain_t *chain_in);
 static ngx_int_t nsmfm_upstream_content_filter(ngx_stream_session_t *s, ngx_chain_t *chain_in);
 
@@ -66,16 +66,23 @@ static MinecraftString *nsmfm_get_new_hostname(nsmfm_srv_conf_t *sconf, u_char *
     return r;
 }
 
-static ngx_int_t nsmfm_content_filter(ngx_stream_session_t *s, ngx_chain_t *chain_in, ngx_uint_t from_upstream) {
-    if (nsmfcfm_get_session_context(s) == NULL) {
+static ngx_int_t nsmfcfm(ngx_stream_session_t *s, ngx_chain_t *chain_in, ngx_uint_t from_upstream) {
+    nsmfcfm_session_context  *cfctx;
+
+    cfctx = nsmfcfm_get_session_context(s);
+
+    if (cfctx == NULL) {
         return ngx_stream_next_filter(s, chain_in, from_upstream);
     }
 
-    if (from_upstream) {
-        return nsmfm_upstream_content_filter(s, chain_in);
-    } else {
-        return nsmfm_client_content_filter(s, chain_in);
+    if (!cfctx->client_content_filter) {
+        cfctx->client_content_filter = nsmfm_client_content_filter;
     }
+    if (!cfctx->upstream_content_filter) {
+        cfctx->upstream_content_filter = nsmfm_upstream_content_filter;
+    }
+
+    return from_upstream ? cfctx->upstream_content_filter(s, chain_in) : cfctx->client_content_filter(s, chain_in);
 }
 
 static ngx_int_t nsmfm_upstream_content_filter(ngx_stream_session_t *s, ngx_chain_t *chain_in) {
@@ -130,8 +137,8 @@ static ngx_int_t nsmfm_client_content_filter(ngx_stream_session_t *s, ngx_chain_
     u_char                    port_char;
     int                       parsed_var;
     int                       old_len;
-    MinecraftVarint          *old_content_len;
-    MinecraftVarint          *new_content_len = NULL;
+    MinecraftVarint          *old_content_len = nullptr;
+    MinecraftVarint          *new_content_len = nullptr;
     MinecraftString          *new_hostname;
 
     int                       in_buf_len;
@@ -143,15 +150,16 @@ static ngx_int_t nsmfm_client_content_filter(ngx_stream_session_t *s, ngx_chain_
     ngx_chain_t             **link_i;
     ngx_chain_t              *append_i;
 
+    ngx_chain_t              *ln;
+
     c = s->connection;
+
     cfctx = nsmfcfm_get_session_context(s);
     if (cfctx == NULL) {
         return ngx_stream_next_filter(s, chain_in, 0);
     }
 
     mctx = nsmfpm_get_session_context(s);
-
-    c->log->action = (char *) "filtering minecraft packet";
 
     sconf = (nsmfm_srv_conf_t *) ngx_stream_get_module_srv_conf(s, ngx_stream_minecraft_forward_module);
 
@@ -168,10 +176,6 @@ static ngx_int_t nsmfm_client_content_filter(ngx_stream_session_t *s, ngx_chain_
         return ngx_stream_next_filter(s, chain_in, 0);
     }
 
-    if (cfctx->out) {
-        goto chain_update;
-    }
-
     switch (parsed_var) {
         case _MC_HANDSHAKE_LOGINSTART_STATE_:
             c->log->action = (char *) "filtering and forwarding new minecraft loginstart packet";
@@ -180,7 +184,6 @@ static ngx_int_t nsmfm_client_content_filter(ngx_stream_session_t *s, ngx_chain_
             c->log->action = (char *) "filtering and forwarding minecraft ping packet";
             break;
         default:
-            c->log->action = (char *) "filtering minecraft packet";
             goto filter_failure;
     }
 
@@ -206,7 +209,7 @@ static ngx_int_t nsmfm_client_content_filter(ngx_stream_session_t *s, ngx_chain_
         goto filter_failure;
     }
 
-    // https://wiki.vg/Protocol#Handshake
+    // https://minecraft.wiki/w/Java_Edition_protocol#Handshake
     // Packet id, Protocol Version varint, Prefixed string (Length varint + content), Server port, Next state.
     parsed_var = 1 + mctx->handshake->protocol_number->bytes_length + new_hostname->length->bytes_length
         + MinecraftVarint::parse(new_hostname->length->bytes, NULL) + _MC_PORT_LEN_ + 1;
@@ -218,7 +221,7 @@ static ngx_int_t nsmfm_client_content_filter(ngx_stream_session_t *s, ngx_chain_
     in_buf_len = 0;
     gathered_buf_len = 0;
 
-    for (ngx_chain_t *ln = cfctx->in; ln != NULL; ln = ln->next) {
+    for (ln = cfctx->in; ln != NULL; ln = ln->next) {
         in_buf_len = ngx_buf_size(ln->buf);
 
         if (in_buf_len <= 0) {
@@ -365,14 +368,16 @@ static ngx_int_t nsmfm_client_content_filter(ngx_stream_session_t *s, ngx_chain_
     // https://hg.nginx.org/njs/file/77e4b95109d4/nginx/ngx_stream_js_module.c#l585
     // https://mailman.nginx.org/pipermail/nginx-devel/2022-January/6EUIJQXVFHMRZP3L5SJNWPJKQPROWA7U.html
 
-    for (ngx_chain_t *ln = chain_in; ln != NULL; ln = ln->next) {
+    while (chain_in) {
+        ln = chain_in;
         ln->buf->pos = ln->buf->last;
         if (ln == target_chain_node) {
+            chain_in = chain_in->next;
             break;
         }
+        chain_in = chain_in->next;
     }
 
-chain_update:
     rc = ngx_stream_next_filter(s, cfctx->out, 0);
 
 #if (NGX_DEBUG)
@@ -390,9 +395,6 @@ chain_update:
             switch (rc) {
                 case NGX_OK:
                     goto end_of_filter;
-                case NGX_AGAIN:
-                    return rc;
-                case NGX_ERROR:
                 default:
                     goto filter_failure;
             }
@@ -402,7 +404,9 @@ chain_update:
     }
 
 end_of_filter:
-    delete new_content_len;
+    if (new_content_len) {
+        delete new_content_len;
+    }
     
     rc = cfctx->fail ? NGX_ERROR : rc;
     if (cfctx->fail) {
@@ -421,6 +425,6 @@ filter_failure:
 
 static ngx_int_t nsmfcfm_post_init(ngx_conf_t *cf) {
     ngx_stream_next_filter = ngx_stream_top_filter;
-    ngx_stream_top_filter = nsmfm_content_filter;
+    ngx_stream_top_filter = nsmfcfm;
     return NGX_OK;
 }
