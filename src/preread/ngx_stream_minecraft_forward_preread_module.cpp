@@ -66,12 +66,11 @@ static ngx_int_t nsmfpm(ngx_stream_session_t *s) {
         return NGX_AGAIN;
     }
 
+    if (!nsmfpm_create_session_context(s)) {
+        return NGX_ERROR;
+    }
     ctx = nsmfpm_get_session_context(s);
-    if (ctx == NULL) {
-        if (!nsmfpm_create_session_context(s)) {
-            return NGX_ERROR;
-        }
-        ctx = nsmfpm_get_session_context(s);
+    if (!ctx->handler) {
         ctx->handler = nsmfpm_handshake;
     }
 
@@ -118,6 +117,9 @@ static ngx_int_t nsmfpm_handshake(ngx_stream_session_t *s) {
 
     c = s->connection;
     c->log->action = (char *) "prereading minecraft handshake packet";
+#if (NGX_DEBUG)
+    ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0, "Prereading minecraft handshake packet");
+#endif
 
     ctx = (nsmfpm_session_context *) nsmfpm_get_session_context(s);
 
@@ -222,9 +224,14 @@ static ngx_int_t nsmfpm_handshake(ngx_stream_session_t *s) {
 
             cfctx->in->buf->last_buf = 1;
             cfctx->in->next = NULL;
-
+#if (NGX_DEBUG)
+            ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0, "Finish prereading handshake packet. Next state status.");
+#endif
             return NGX_OK;
         case _MC_HANDSHAKE_LOGINSTART_STATE_:
+#if (NGX_DEBUG)
+            ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0, "Finish prereading handshake packet. Next state login.");
+#endif
             ctx->handler = nsmfpm_loginstart;
             ctx->bufpos = bufpos;
             break;
@@ -254,8 +261,12 @@ static ngx_int_t nsmfpm_loginstart(ngx_stream_session_t *s) {
 
     c = s->connection;
     c->log->action = (char *) "prereading minecraft loginstart packet";
+#if (NGX_DEBUG)
+    ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0, "Prereading minecraft loginstart packet");
+#endif
 
     ctx = (nsmfpm_session_context *) nsmfpm_get_session_context(s);
+
     if (!nsmfcfm_create_session_context(s)) {
         return NGX_ERROR;
     }

@@ -151,14 +151,14 @@ ngx_int_t MinecraftHandshake::determine_content(ngx_stream_session_t *s, u_char 
     }
 
     parse_var = MinecraftVarint::parse(handshake->id->bytes, &varint_byte_len);
-    if (parse_var < 0) {
+    if (parse_var < 0 || *bufpos[0] != parse_var) {
         ngx_log_error(NGX_LOG_ALERT, c->log, 0, "Cannot read packet id");
         return NGX_ERROR;
     }
-    if (*bufpos[0] != parse_var) {
+    if (parse_var != _MC_HANDSHAKE_PACKET_ID_) {
         ngx_log_error(NGX_LOG_ALERT, c->log, 0,
                       "Read unexpected packet id (%d), (%d) is expected",
-                      *bufpos[0], parse_var);
+                      parse_var, _MC_HANDSHAKE_PACKET_ID_);
         return NGX_ERROR;
     }
     (*bufpos) += varint_byte_len;
@@ -250,14 +250,14 @@ ngx_int_t MinecraftLoginstart::determine_content(ngx_stream_session_t *s, u_char
     }
 
     parse_var = MinecraftVarint::parse(loginstart->id->bytes, &varint_byte_len);
-    if (parse_var < 0) {
+    if (parse_var < 0 || *bufpos[0] != parse_var) {
         ngx_log_error(NGX_LOG_ALERT, c->log, 0, "Cannot read packet id");
         return NGX_ERROR;
     }
-    if (*bufpos[0] != parse_var) {
+    if (parse_var != _MC_LOGINSTART_PACKET_ID_) {
         ngx_log_error(NGX_LOG_ALERT, c->log, 0,
                       "Read unexpected packet id (%d), (%d) is expected",
-                      *bufpos[0], parse_var);
+                      parse_var, _MC_LOGINSTART_PACKET_ID_);
         return NGX_ERROR;
     }
     (*bufpos) += varint_byte_len;
