@@ -40,7 +40,7 @@ jobs:
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          java-version: "21"
+          java-version: "17"
           distribution: "temurin"
           java-package: "jre"
       
@@ -81,16 +81,90 @@ jobs:
           rm -rf mcping-src
           chmod +x ./mcping
       
-      - name: Setup PaperSpigot
+      - name: Setup PandaSpigot
         working-directory: ${{ steps.compile.outputs.cosmetic_dir }}
         run: |
           mkdir -p spigot
           cd spigot
+
+          export SPIGOT_JAR="spigot.jar"
           
-          curl -o paper.jar -fsSL https://api.papermc.io/v2/projects/paper/versions/1.21.3/builds/82/downloads/paper-1.21.3-82.jar
+          curl -o $SPIGOT_JAR -fsSL https://downloads.hpfxd.com/v2/projects/pandaspigot/versions/1.8.8/builds/latest/downloads/paperclip
           
           mkdir -p plugins
           curl -o plugins/viaversion.jar -fsSL https://github.com/ViaVersion/ViaVersion/releases/download/5.2.1/ViaVersion-5.2.1.jar
+
+          mkdir -p plugins/ViaVersion
+          cat << EOF > plugins/ViaVersion/config.yml
+          check-for-updates: false
+          send-supported-versions: true
+          block-versions: []
+          block-protocols: []
+          block-disconnect-msg: You are using an unsupported Minecraft version!
+          reload-disconnect-msg: Server reload, please rejoin!
+          suppress-conversion-warnings: true
+          max-pps: 800
+          max-pps-kick-msg: You are sending too many packets!
+          tracking-period: 6
+          tracking-warning-pps: 120
+          tracking-max-warnings: 4
+          tracking-max-kick-msg: You are sending too many packets, :(
+          register-userconnections-on-join: true
+          hologram-patch: false
+          hologram-y: -0.96
+          piston-animation-patch: false
+          chat-nbt-fix: true
+          quick-move-action-fix: false
+          team-colour-fix: true
+          disable-1_13-auto-complete: false
+          1_13-tab-complete-delay: 10
+          fix-low-snow-collision: true
+          fix-infested-block-breaking: true
+          truncate-1_14-books: true
+          change-1_9-hitbox: false
+          change-1_14-hitbox: false
+          fix-non-full-blocklight: true
+          fix-1_14-health-nan: true
+          use-1_15-instant-respawn: false
+          serverside-blockconnections: true
+          blockconnection-method: packet
+          reduce-blockstorage-memory: false
+          flowerstem-when-block-above: false
+          vine-climb-fix: false
+          ignore-long-1_16-channel-names: true
+          forced-use-1_17-resource-pack: false
+          resource-pack-1_17-prompt: ''
+          cache-1_17-light: true
+          armor-toggle-fix: true
+          map-1_16-world-names:
+            overworld: minecraft:overworld
+            nether: minecraft:the_nether
+            end: minecraft:the_end
+          translate-ocelot-to-cat: false
+          enforce-secure-chat: false
+          handle-invalid-item-count: false
+          hide-scoreboard-numbers: false
+          fix-1_21-placement-rotation: true
+          prevent-collision: true
+          auto-team: true
+          suppress-metadata-errors: true
+          shield-blocking: false
+          no-delay-shield-blocking: false
+          show-shield-when-sword-in-hand: false
+          simulate-pt: true
+          nms-player-ticking: true
+          bossbar-patch: true
+          bossbar-anti-flicker: false
+          use-new-effect-indicator: true
+          use-new-deathmessages: true
+          item-cache: true
+          replace-pistons: false
+          replacement-piston-id: 0
+          chunk-border-fix: false
+          left-handed-handling: false
+          cancel-block-sounds: true
+          sword-blocking-via-consumable: true
+          EOF
 
           cat << EOF > bukkit.yml
           settings:
@@ -100,36 +174,32 @@ jobs:
             update-folder: update
             plugin-profiling: false
             connection-throttle: 4000
-            query-plugins: true
+            query-plugins: false
             deprecated-verbose: default
             shutdown-message: Server closed
-            minimum-api: none
-            use-map-color-cache: true
           spawn-limits:
             monsters: 70
-            animals: 10
+            animals: 15
             water-animals: 5
-            water-ambient: 20
-            water-underground-creature: 5
-            axolotls: 5
             ambient: 15
           chunk-gc:
             period-in-ticks: 600
+            load-threshold: 0
           ticks-per:
             animal-spawns: 400
             monster-spawns: 1
-            water-spawns: 1
-            water-ambient-spawns: 1
-            water-underground-creature-spawns: 1
-            axolotl-spawns: 1
-            ambient-spawns: 1
             autosave: 6000
           aliases: now-in-commands.yml
+          database:
+            username: bukkit
+            isolation: SERIALIZABLE
+            driver: org.sqlite.JDBC
+            password: walrus
+            url: jdbc:sqlite:{DIR}{NAME}.db
           EOF
 
           cat << EOF > commands.yml
           command-block-overrides: []
-          ignore-vanilla-permissions: false
           aliases:
             icanhasbukkit:
             - version $1-
@@ -139,7 +209,155 @@ jobs:
           eula=true
           EOF
 
+          cat << EOF > pandaspigot.yml
+          trackPluginScoreboards: false
+          proxyOnlineMode: true
+          maxBookPageSize: 2560
+          maxBookTotalSizeMultiplier: 0.98
+          packetLimiter:
+            kickMessage: "&cSent too many packets."
+            limits:
+              all:
+                interval: 7.0
+                maxPacketRate: 500.0
+          logPlayerIpAddresses: true
+          worlds:
+            default:
+              timeUpdateFrequency: 100
+              smoothTeleportation: false
+              disablePlayerData: true
+              disableChunkSaving: true
+              disableEntityAi: true
+              randomArrowTrajectory: true
+              knockback:
+                friction: 2.0
+                horizontal: 0.4
+                vertical: 0.4
+                verticalLimit: 0.4000000059604645
+                extraHorizontal: 0.5
+                extraVertical: 0.1
+              optimizeTntMovement: false
+              optimizeLiquidExplosions: true
+              optimizeArmorStandMovement: false
+              randomArrowDamage: true
+          EOF
+
+          cat << EOF > paper.yml
+          config-version: 9
+          data-value-allowed-items: []
+          settings:
+            baby-zombie-movement-speed: 0.5
+            limit-player-interactions: true
+          effect-modifiers:
+            strength: 1.3
+            weakness: -0.5
+          stackable-buckets:
+            lava: false
+            water: false
+            milk: false
+          warnWhenSettingExcessiveVelocity: true
+          world-settings:
+            default:
+              verbose: true
+              keep-spawn-loaded: true
+              generator-settings:
+                canyon: true
+                caves: true
+                dungeon: true
+                fortress: true
+                mineshaft: true
+                monument: true
+                stronghold: true
+                temple: true
+                village: true
+                flat-bedrock: false
+              allow-block-location-tab-completion: true
+              disable-thunder: false
+              disable-ice-and-snow: false
+              tick-next-tick-list-cap: 10000
+              tick-next-tick-list-cap-ignores-redstone: false
+              falling-blocks-collide-with-signs: false
+              disable-mood-sounds: false
+              use-async-lighting: false
+              portal-search-radius: 128
+              player-blocking-damage-multiplier: 0.5
+              remove-invalid-mob-spawner-tile-entities: true
+              optimize-explosions: false
+              mob-spawner-tick-rate: 1
+              cache-chunk-maps: false
+              tnt-explosion-volume: 4.0
+              disable-teleportation-suffocation-check: false
+              squid-spawn-height:
+                minimum: 45.0
+                maximum: 63.0
+              max-growth-height:
+                cactus: 3
+                reeds: 3
+              fishing-time-range:
+                MinimumTicks: 100
+                MaximumTicks: 900
+              player-exhaustion:
+                block-break: 0.02500000037252903
+                swimming: 0.014999999664723873
+              despawn-ranges:
+                soft: 32
+                hard: 128
+              falling-block-height-nerf: 0
+              remove-unloaded:
+                enderpearls: true
+                tnt-entities: true
+                falling-blocks: true
+              game-mechanics:
+                boats-drop-boats: false
+                disable-player-crits: false
+                disable-chest-cat-detection: false
+                disable-end-credits: false
+              nether-ceiling-void-damage: false
+              load-chunks:
+                enderpearls: false
+                tnt-entities: false
+                falling-blocks: false
+              fast-drain:
+                lava: false
+                water: false
+              lava-flow-speed:
+                normal: 30
+                nether: 10
+              disable-explosion-knockback: false
+              water-over-lava-flow-speed: 5
+              fix-cannons: false
+              tnt-entity-height-nerf: 0
+              use-hopper-check: false
+              all-chunks-are-slime-chunks: false
+              allow-undead-horse-leashing: false
+              container-update-tick-rate: 1
+          EOF
+
           cat << EOF > spigot.yml
+          config-version: 8
+          settings:
+            debug: false
+            late-bind: false
+            sample-count: 0
+            player-shuffle: 0
+            filter-creative-items: true
+            user-cache-size: 1000
+            save-user-cache-on-stop-only: false
+            int-cache-limit: 1024
+            bungeecord: false
+            moved-wrongly-threshold: 0.0625
+            moved-too-quickly-threshold: 100.0
+            timeout-time: 60
+            restart-on-crash: false
+            restart-script: ./start.sh
+            netty-threads: 4
+            attribute:
+              maxHealth:
+                max: 2048.0
+              movementSpeed:
+                max: 2048.0
+              attackDamage:
+                max: 2048.0
           messages:
             whitelist: You are not whitelisted on this server!
             unknown-command: Unknown command. Type "/help" for help.
@@ -147,38 +365,11 @@ jobs:
             outdated-client: Outdated client! Please use {0}
             outdated-server: Outdated server! I'm still on {0}
             restart: Server is restarting
-          advancements:
+          stats:
             disable-saving: true
-            disabled:
-            - minecraft:story/disabled
-          settings:
-            bungeecord: false
-            save-user-cache-on-stop-only: false
-            sample-count: 0
-            player-shuffle: 0
-            user-cache-size: 1000
-            moved-wrongly-threshold: 0.0625
-            moved-too-quickly-multiplier: 10.0
-            timeout-time: 60
-            restart-on-crash: false
-            restart-script: ./start.sh
-            netty-threads: 4
-            attribute:
-              maxAbsorption:
-                max: 2048.0
-              maxHealth:
-                max: 2048.0
-              movementSpeed:
-                max: 2048.0
-              attackDamage:
-                max: 2048.0
-            log-villager-deaths: true
-            log-named-deaths: true
-            debug: false
+            forced-stats: {}
           commands:
             tab-complete: 0
-            send-namespaced: true
-            log: true
             spam-exclusions:
             - /skill
             silent-commandblock-console: false
@@ -187,26 +378,46 @@ jobs:
             - summon
             - testforblock
             - tellraw
+            log: true
+          timings:
+            enabled: true
+            verbose: true
+            server-name-privacy: false
+            hidden-config-entries:
+            - database
+            - settings.bungeecord-addresses
+            history-interval: 300
+            history-length: 3600
           world-settings:
             default:
-              below-zero-generation-in-existing-chunks: true
-              view-distance: default
-              simulation-distance: default
-              thunder-chance: 100000
+              verbose: true
+              chunks-per-tick: 650
+              clear-tick-list: false
               merge-radius:
-                item: 0.5
-                exp: -1.0
-              mob-spawn-range: 8
-              item-despawn-rate: 6000
-              arrow-despawn-rate: 1200
-              trident-despawn-rate: 1200
-              zombie-aggressive-towards-villager: true
+                exp: 3.0
+                item: 2.5
+              anti-xray:
+                enabled: true
+                engine-mode: 1
+                hide-blocks:
+                - 14
+                - 15
+                - 16
+                - 21
+                - 48
+                - 49
+                - 54
+                - 56
+                - 73
+                - 74
+                - 82
+                - 129
+                - 130
+                replace-blocks:
+                - 1
+                - 5
+              mob-spawn-range: 4
               nerf-spawner-mobs: false
-              enable-zombie-pigmen-portal-spawns: true
-              wither-spawn-sound-radius: 0
-              end-portal-sound-radius: 0
-              hanging-tick-frequency: 100
-              unload-frozen-chunks: false
               growth:
                 cactus-modifier: 100
                 cane-modifier: 100
@@ -214,169 +425,83 @@ jobs:
                 mushroom-modifier: 100
                 pumpkin-modifier: 100
                 sapling-modifier: 100
-                beetroot-modifier: 100
-                carrot-modifier: 100
-                potato-modifier: 100
-                torchflower-modifier: 100
                 wheat-modifier: 100
                 netherwart-modifier: 100
-                vine-modifier: 100
-                cocoa-modifier: 100
-                bamboo-modifier: 100
-                sweetberry-modifier: 100
-                kelp-modifier: 100
-                twistingvines-modifier: 100
-                weepingvines-modifier: 100
-                cavevines-modifier: 100
-                glowberry-modifier: 100
-                pitcherplant-modifier: 100
               entity-activation-range:
                 animals: 32
                 monsters: 32
-                raiders: 64
                 misc: 16
-                water: 16
-                villagers: 32
-                flying-monsters: 32
-                wake-up-inactive:
-                  animals-max-per-tick: 4
-                  animals-every: 1200
-                  animals-for: 100
-                  monsters-max-per-tick: 8
-                  monsters-every: 400
-                  monsters-for: 100
-                  villagers-max-per-tick: 4
-                  villagers-every: 600
-                  villagers-for: 100
-                  flying-monsters-max-per-tick: 8
-                  flying-monsters-every: 200
-                  flying-monsters-for: 100
-                villagers-work-immunity-after: 100
-                villagers-work-immunity-for: 20
-                villagers-active-for-panic: true
-                tick-inactive-villagers: true
-                ignore-spectators: false
               entity-tracking-range:
-                players: 128
-                animals: 96
-                monsters: 96
-                misc: 96
-                display: 128
+                players: 48
+                animals: 48
+                monsters: 48
+                misc: 32
                 other: 64
               ticks-per:
                 hopper-transfer: 8
-                hopper-check: 1
+                hopper-check: 8
               hopper-amount: 1
-              hopper-can-load-chunks: false
+              random-light-updates: false
+              save-structure-info: true
+              max-bulk-chunks: 10
+              max-entity-collisions: 8
               dragon-death-sound-radius: 0
               seed-village: 10387312
-              seed-desert: 14357617
-              seed-igloo: 14357618
-              seed-jungle: 14357619
-              seed-swamp: 14357620
-              seed-monument: 10387313
-              seed-shipwreck: 165745295
-              seed-ocean: 14357621
-              seed-outpost: 165745296
-              seed-endcity: 10387313
-              seed-slime: 987234911
-              seed-nether: 30084232
-              seed-mansion: 10387319
-              seed-fossil: 14357921
-              seed-portal: 34222645
-              seed-ancientcity: 20083232
-              seed-trailruins: 83469867
-              seed-trialchambers: 94251327
-              seed-buriedtreasure: 10387320
-              seed-mineshaft: default
-              seed-stronghold: default
+              seed-feature: 14357617
               hunger:
-                jump-walk-exhaustion: 0.05
-                jump-sprint-exhaustion: 0.2
-                combat-exhaustion: 0.1
-                regen-exhaustion: 6.0
-                swim-multiplier: 0.01
-                sprint-multiplier: 0.1
-                other-multiplier: 0.0
+                walk-exhaustion: 0.2
+                sprint-exhaustion: 0.8
+                combat-exhaustion: 0.3
+                regen-exhaustion: 3.0
               max-tnt-per-tick: 100
-              max-tick-time:
-                tile: 50
-                entity: 50
-              verbose: false
-          players:
-            disable-saving: true
-          config-version: 12
-          stats:
-            disable-saving: true
-            forced-stats: {}
+              item-despawn-rate: 6000
+              arrow-despawn-rate: 1200
+              enable-zombie-pigmen-portal-spawns: true
+              wither-spawn-sound-radius: 0
+              view-distance: 10
+              hanging-tick-frequency: 100
+              zombie-aggressive-towards-villager: true
           EOF
 
           cat << EOF > server.properties
-          accepts-transfers=false
           allow-flight=false
           allow-nether=false
-          broadcast-console-to-ops=true
-          broadcast-rcon-to-ops=true
-          bug-report-link=
-          debug=false
-          difficulty=normal
+          announce-player-achievements=true
+          difficulty=1
           enable-command-block=false
-          enable-jmx-monitoring=false
           enable-query=false
           enable-rcon=false
-          enable-status=true
-          enforce-secure-profile=false
-          enforce-whitelist=false
-          entity-broadcast-range-percentage=100
           force-gamemode=false
-          function-permission-level=2
-          gamemode=survival
+          gamemode=0
           generate-structures=false
-          generator-settings={}
+          generator-settings=
           hardcore=false
-          hide-online-players=true
-          initial-disabled-packs=
-          initial-enabled-packs=vanilla
           level-name=world
           level-seed=
-          level-type=minecraft\:superflat
-          log-ips=true
-          max-chained-neighbor-updates=1000000
+          level-type=FLAT
+          max-build-height=256
           max-players=2
-          max-tick-time=60000
           max-world-size=29999984
           motd=A Minecraft Server
           network-compression-threshold=256
           online-mode=false
           op-permission-level=4
-          pause-when-empty-seconds=60
           player-idle-timeout=0
-          prevent-proxy-connections=false
           pvp=true
-          query.port=25565
-          rate-limit=0
-          rcon.password=
-          rcon.port=25575
-          region-file-compression=deflate
-          require-resource-pack=false
           resource-pack=
-          resource-pack-id=
-          resource-pack-prompt=
-          resource-pack-sha1=
+          resource-pack-hash=
           server-ip=127.0.0.1
           server-port=25567
-          simulation-distance=2
+          snooper-enabled=false
+          spawn-animals=false
           spawn-monsters=false
-          spawn-protection=1
-          sync-chunk-writes=true
-          text-filtering-config=
-          text-filtering-version=0
+          spawn-npcs=false
           use-native-transport=true
           view-distance=4
           white-list=false
           EOF
 
-          nohup java -jar paper.jar nogui 2>&1 &
+          nohup java -jar $SPIGOT_JAR nogui 2>&1 &
 
         continue-on-error: false
       
@@ -462,7 +587,6 @@ jobs:
           name: ${{ github.run_id }}-${{ matrix.os }}-nginx-${{ matrix.nginx_version }}
           path: |
             ${{ steps.compile.outputs.cosmetic_dir }}/nginx-${{ matrix.nginx_version }}
-            ${{ steps.compile.outputs.cosmetic_dir }}/spigot/config
             ${{ steps.compile.outputs.cosmetic_dir }}/spigot/crash-reports
             ${{ steps.compile.outputs.cosmetic_dir }}/spigot/logs
           retention-days: 1
