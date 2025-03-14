@@ -137,7 +137,8 @@ static ngx_int_t nsmfpm_handshake(ngx_stream_session_t *s) {
     parse_var = MinecraftVarint::parse(handshake->length->bytes, NULL);
     if (parse_var < 0) {
         return NGX_ERROR;
-    } else if (parse_var == 0) {
+    }
+    if (parse_var == 0) {
         rc = handshake->determine_length(s, &bufpos, c->buffer->last);
         if (rc != NGX_OK) {
             return rc;

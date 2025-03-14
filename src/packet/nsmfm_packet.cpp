@@ -88,7 +88,7 @@ ngx_int_t MinecraftString::determine_content(ngx_stream_session_t *s, u_char **b
         return NGX_AGAIN;
     }
     
-    this->content = (u_char *) ngx_pnalloc(this->pool, str_length + 1);
+    this->content = (u_char *) ngx_pnalloc(this->pool, (str_length + 1) * sizeof(u_char));
     if (!this->content) {
         return NGX_ERROR;
     }
@@ -118,7 +118,7 @@ ngx_int_t MinecraftPacket::determine_content(ngx_stream_session_t *s, u_char *bu
         return NGX_AGAIN;
     }
     
-    this->content = (u_char *) ngx_pnalloc(this->pool, packet_length);
+    this->content = (u_char *) ngx_pnalloc(this->pool, packet_length * sizeof(u_char));
     if (!this->content) {
         return NGX_ERROR;
     }
