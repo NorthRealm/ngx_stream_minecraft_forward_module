@@ -1,8 +1,8 @@
 extern "C"
 {
 #include <ngx_core.h>
-#include "../protocol/nsmfm_protocol_number.h"
 }
+#include "../protocol/nsmfm_protocol_number.hpp"
 #include "nsmfm_packet.hpp"
 #include "../protocol/nsmfm_varint.hpp"
 #include "../preread/nsmfpm_session.hpp"

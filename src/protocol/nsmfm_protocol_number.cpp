@@ -1,6 +1,6 @@
-#include "nsmfm_protocol_number.h"
+#include "nsmfm_protocol_number.hpp"
 
-int nsmfm_is_known_protocol(int var) {
+bool nsmfm_is_known_protocol(int var) {
     switch (var) {
         case MINECRAFT_1_21_4:
         case MINECRAFT_1_21_3:
@@ -44,8 +44,11 @@ int nsmfm_is_known_protocol(int var) {
         case MINECRAFT_1_9_1:
         case MINECRAFT_1_9:
         case MINECRAFT_1_8_9:
-            return 1;
+        case MINECRAFT_1_7_10:
+        case MINECRAFT_1_7_5:
+        case MINECRAFT_1_7_1:
+            return true;
         default:
-            return 0;
+            return false;
     }
 }

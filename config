@@ -17,12 +17,12 @@ $NSMFM_SRCDIR/protocol"
 
 NSMFM_DEPS="$NSMFM_SRCDIR/protocol/nsmfm_uuid.hpp \
 $NSMFM_SRCDIR/protocol/nsmfm_varint.hpp \
-$NSMFM_SRCDIR/protocol/nsmfm_protocol_number.h \
+$NSMFM_SRCDIR/protocol/nsmfm_protocol_number.hpp \
 $NSMFM_SRCDIR/packet/nsmfm_packet.hpp"
 
 NSMFM_DEP_SRCS="$NSMFM_SRCDIR/protocol/nsmfm_uuid.cpp \
 $NSMFM_SRCDIR/protocol/nsmfm_varint.cpp \
-$NSMFM_SRCDIR/protocol/nsmfm_protocol_number.c \
+$NSMFM_SRCDIR/protocol/nsmfm_protocol_number.cpp \
 $NSMFM_SRCDIR/packet/nsmfm_packet.cpp"
 
 NSMFM_MAIN_SRCS="$NSMFM_SRCDIR/main/ngx_stream_minecraft_forward_module.cpp"

@@ -7,6 +7,20 @@
 #ifndef _NSMFM_MINECRAFT_JAVA_PROTOCOL_NUMBER_
 #define _NSMFM_MINECRAFT_JAVA_PROTOCOL_NUMBER_
 
+bool nsmfm_is_known_protocol(int var);
+
+#define MINECRAFT_1_7    3
+#define MINECRAFT_1_7_1  3
+#define MINECRAFT_1_7_2  4
+#define MINECRAFT_1_7_3  4
+#define MINECRAFT_1_7_4  4
+#define MINECRAFT_1_7_5  4
+#define MINECRAFT_1_7_6  5
+#define MINECRAFT_1_7_7  5
+#define MINECRAFT_1_7_8  5
+#define MINECRAFT_1_7_9  5
+#define MINECRAFT_1_7_10 5
+
 #define MINECRAFT_1_8   47
 #define MINECRAFT_1_8_1 47
 #define MINECRAFT_1_8_2 47
@@ -83,7 +97,5 @@
 #define MINECRAFT_1_21_2 768
 #define MINECRAFT_1_21_3 768
 #define MINECRAFT_1_21_4 769
-
-int nsmfm_is_known_protocol(int var);
 
 #endif
