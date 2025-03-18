@@ -98,15 +98,15 @@ static void *nsmfm_create_srv_conf(ngx_conf_t *cf) {
     conf->hostname_map_init.name = (char *)"minecraft_server_hostname";
     conf->hostname_map_init.pool = cf->pool;
     conf->hostname_map_init.temp_pool = cf->temp_pool;
+    
     conf->hash_max_size = NGX_CONF_UNSET_SIZE;
     conf->hash_bucket_size = NGX_CONF_UNSET_SIZE;
+    
     conf->hostname_map_keys.pool = cf->pool;
     conf->hostname_map_keys.temp_pool = cf->temp_pool;
-
     rc = ngx_hash_keys_array_init(&conf->hostname_map_keys, NGX_HASH_SMALL);
     if (rc != NGX_OK) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "There's a problem adding hash key, possibly because of duplicate entry");
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "There's a problem initializing hash keys array");
         return NULL;
     }
 
@@ -118,17 +118,27 @@ static void *nsmfm_create_srv_conf(ngx_conf_t *cf) {
 static char *nsmfm_srv_conf_minecraft_server_hostname(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
     ngx_int_t   rc;
     ngx_str_t  *values;
-    ngx_str_t  *key;
-    ngx_str_t  *val;
+    ngx_str_t  *read_key;
+    ngx_str_t  *read_val;
+
+    u_char     *val;
 
     nsmfm_srv_conf_t *sc = (nsmfm_srv_conf_t *) conf;
 
     values = (ngx_str_t *) cf->args->elts;
 
-    key = &values[1];
-    val = &values[2];
+    read_key = &values[1];
+    read_val = &values[2];
 
-    rc = ngx_hash_add_key(&sc->hostname_map_keys, key, val, NGX_HASH_READONLY_KEY);
+#if (NGX_DEBUG)
+    ngx_conf_log_error(NGX_LOG_WARN, cf, 0, "minecraft_server_hostname: %s - %s", read_key->data, read_val->data);
+#endif
+
+    val = (u_char *) ngx_pnalloc(cf->pool, (read_val->len + 1) * sizeof(u_char));
+    ngx_memcpy(val, read_val->data, read_val->len);
+    val[read_val->len] = 0;
+
+    rc = ngx_hash_add_key(&sc->hostname_map_keys, read_key, val, NGX_HASH_READONLY_KEY);
     if (rc != NGX_OK) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "There's a problem adding hash key, possibly because of duplicate entry");
@@ -145,7 +155,7 @@ static char *nsmfm_merge_srv_conf(ngx_conf_t *cf, void *prev, void *conf) {
 
     ngx_str_t         *key;
     ngx_uint_t         hashed_key;
-    ngx_str_t         *val;
+    u_char            *val;
 
     pconf = (nsmfm_srv_conf_t *) prev;
     cconf = (nsmfm_srv_conf_t *) conf;
@@ -186,14 +196,16 @@ static char *nsmfm_merge_srv_conf(ngx_conf_t *cf, void *prev, void *conf) {
 
         hashed_key = ngx_hash_key(key->data, key->len);
 
-        val = (ngx_str_t *)ngx_hash_find(&pconf->hostname_map, hashed_key, key->data, key->len);
+        val = (u_char *)ngx_hash_find(&pconf->hostname_map, hashed_key, key->data, key->len);
 
         if (val == NULL) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "A hash key previously in stream context becomes missing?! This should not happen");
             return (char *)NGX_CONF_ERROR;
         }
-
+#if (NGX_DEBUG)
+        ngx_conf_log_error(NGX_LOG_WARN, cf, 0, "Merging: minecraft_server_hostname: %s - %s", key->data, val);
+#endif
         rc = ngx_hash_add_key(&cconf->hostname_map_keys, key, val, NGX_HASH_READONLY_KEY);
         if (rc != NGX_OK) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,

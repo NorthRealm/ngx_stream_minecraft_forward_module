@@ -52,17 +52,17 @@ static MinecraftString *nsmfm_get_new_hostname(nsmfm_srv_conf_t *sconf, u_char *
         return NULL;
     }
 
-    ngx_str_t *res;
+    u_char *res;
     
-    res = (ngx_str_t *) ngx_hash_find(&sconf->hostname_map, ngx_hash_key(buf, len), buf, len);
+    res = (u_char *)ngx_hash_find(&sconf->hostname_map, ngx_hash_key(buf, len), buf, len);
     if (!res) {
         return NULL;
     }
 
     MinecraftString *r;
     r = new MinecraftString();
-    r->length = MinecraftVarint::create(res->len);
-    r->content = res->data;
+    r->length = MinecraftVarint::create(ngx_strlen(res));
+    r->content = res;
     return r;
 }
 

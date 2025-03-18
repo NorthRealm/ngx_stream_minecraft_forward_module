@@ -6,7 +6,7 @@
 typedef struct {
     ngx_hash_t             hostname_map;
     ngx_hash_init_t        hostname_map_init;
-    ngx_hash_keys_arrays_t hostname_map_keys; /* Both `key` and `value` are `ngx_str_t *` */
+    ngx_hash_keys_arrays_t hostname_map_keys; // `key`:`ngx_str_t *`, `value`:`u_char *`
     size_t                 hash_max_size;
     size_t                 hash_bucket_size;
 
