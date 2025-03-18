@@ -29,7 +29,7 @@ jobs:
       fail-fast: false
       matrix:
         os: ["ubuntu-22.04", "ubuntu-24.04", "ubuntu-22.04-arm", "ubuntu-24.04-arm"]
-        nginx_version: ["1.22.1", "1.23.4", "1.24.0", "1.25.4", "1.25.5", "1.26.2", "1.27.4"]
+        nginx_version: ["1.22.1", "1.23.4", "1.24.0", "1.25.4", "1.25.5", "1.26.2", "1.27.4", "CrimsonEdgeHope"]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -49,36 +49,33 @@ jobs:
         run: |
           export COSMETIC_DIR=$(pwd)
           echo "cosmetic_dir=$COSMETIC_DIR" >> $GITHUB_OUTPUT
-          wget --no-verbose -O "nginx.tar.gz" "https://nginx.org/download/nginx-${{ matrix.nginx_version }}.tar.gz"
-          tar -xf nginx.tar.gz
-          cd nginx-${{ matrix.nginx_version }}
+          
+          if [[ "${{ matrix.nginx_version }}" == "CrimsonEdgeHope" ]]; then
+            git clone https://github.com/CrimsonEdgeHope/nginx.git nginx-${{ matrix.nginx_version }}
+            cd nginx-${{ matrix.nginx_version }}
+            cp auto/configure .
+          else
+            wget --no-verbose -O "nginx.tar.gz" "https://nginx.org/download/nginx-${{ matrix.nginx_version }}.tar.gz"
+            tar -xf nginx.tar.gz
+            cd nginx-${{ matrix.nginx_version }}
+          fi
+          
           chmod +x configure
           ./configure --add-module=$COSMETIC_DIR --with-stream --with-debug --without-http --with-pcre --with-ld-opt="-lstdc++"
           make
       
-      - name: Setup mcping
+      - name: Setup mcping amd64
         if: ${{ !endsWith(matrix.os, 'arm') }}
         working-directory: ${{ steps.compile.outputs.cosmetic_dir }}
         run: |
           wget --no-verbose -O "mcping" "https://github.com/NetherRealmSpigot/mcping/releases/download/v0.0.1/mcping-0.0.1-linux-amd64"
           chmod +x ./mcping
-
-      - name: Setup go
-        if: ${{ endsWith(matrix.os, 'arm') }}
-        uses: actions/setup-go@v5
-        with:
-          go-version: "^1.23"
       
-      - name: Setup mcping
+      - name: Setup mcping arm64
         if: ${{ endsWith(matrix.os, 'arm') }}
         working-directory: ${{ steps.compile.outputs.cosmetic_dir }}
         run: |
-          git clone https://github.com/NetherRealmSpigot/mcping.git mcping-src
-          cd mcping-src
-          make build
-          cp mcping ../
-          cd ..
-          rm -rf mcping-src
+          wget --no-verbose -O "mcping" "https://github.com/NetherRealmSpigot/mcping/releases/download/v0.0.1/mcping-0.0.1-linux-arm64"
           chmod +x ./mcping
       
       - name: Setup PandaSpigot
@@ -502,7 +499,7 @@ jobs:
           EOF
 
           nohup java -jar $SPIGOT_JAR nogui 2>&1 &
-
+          sleep 5
         continue-on-error: false
       
       - name: Setup Nginx
@@ -546,7 +543,7 @@ jobs:
           objs/nginx -p $(pwd) -t
           objs/nginx -p $(pwd) -g "daemon on;"
       
-      - name: Run
+      - name: Run pinging
         working-directory: ${{ steps.compile.outputs.cosmetic_dir }}
         run: |
           protocol_numbers=(
@@ -556,6 +553,7 @@ jobs:
             393 401 404 477 480 485 490 498
             210 315 316 335 338 340
             47 107 108 109 110
+            3 4 5
           )
           
           export PING_QUERY_COUNT=60
