@@ -1,0 +1,40 @@
+name: Compile and test
+
+on:
+  push:
+    branches:
+      - "master"
+    paths:
+      - "**/*.c"
+      - "**/*.h"
+      - "**/*.cpp"
+      - "**/*.hpp"
+      - "config"
+      - "!.clang-format"
+      - "!LICENSE"
+      - "!.gitignore"
+      - "!README.md"
+  workflow_dispatch:
+
+
+defaults:
+  run:
+    shell: bash
+
+
+jobs:
+  compile:
+    name: Compile ${{ matrix.nginx_version }} (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-22.04", "ubuntu-24.04", "ubuntu-22.04-arm", "ubuntu-24.04-arm"]
+        nginx_version: ["1.21.0", "1.21.4", "1.22.1", "1.23.4", "1.24.0", "1.25.4", "1.25.5", "1.26.2", "1.27.4", "NetherRealmSpigot"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: NorthRealm/reusable-actions/ngx_stream_minecraft_forward_module/test@main
+        with:
+          build-ref: ${{ github.sha }}
+          nginx-version: ${{ matrix.nginx_version }}
+          wait-panda: 5
+          artifact-retention-days: 1
