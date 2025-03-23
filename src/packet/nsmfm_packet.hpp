@@ -43,8 +43,8 @@ public:
         }
     }
 
-    ngx_int_t determine_length(ngx_stream_session_t *s, u_char **bufpos, u_char *buflast);
-    ngx_int_t determine_content(ngx_stream_session_t *s, u_char **bufpos, u_char *buflast);
+    ngx_int_t determineLength(ngx_stream_session_t *s, u_char **bufpos, u_char *buflast);
+    ngx_int_t determineContent(ngx_stream_session_t *s, u_char **bufpos, u_char *buflast);
 };
 
 class MinecraftPacket {
@@ -78,8 +78,8 @@ public:
         }
     }
 
-    ngx_int_t determine_length(ngx_stream_session_t *s, u_char **bufpos, u_char *buflast);
-    ngx_int_t determine_content(ngx_stream_session_t *s, u_char *bufpos, u_char *buflast);
+    ngx_int_t determineLength(ngx_stream_session_t *s, u_char **bufpos, u_char *buflast);
+    ngx_int_t determineContent(ngx_stream_session_t *s, u_char *bufpos, u_char *buflast);
 };
 
 class MinecraftHandshake : public MinecraftPacket {
@@ -111,7 +111,7 @@ public:
         }
     }
 
-    static ngx_int_t determine_content(ngx_stream_session_t *s, u_char **bufpos, u_char *buflast);
+    static ngx_int_t determineContent(ngx_stream_session_t *s, u_char **bufpos, u_char *buflast);
 };
 
 class MinecraftLoginstart : public MinecraftPacket {
@@ -135,7 +135,7 @@ public:
         }
     }
 
-    static ngx_int_t determine_content(ngx_stream_session_t *s, u_char **bufpos, u_char *buflast);
+    static ngx_int_t determineContent(ngx_stream_session_t *s, u_char **bufpos, u_char *buflast);
 };
 
 #endif

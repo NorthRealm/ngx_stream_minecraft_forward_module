@@ -7,7 +7,7 @@
 #ifndef _NSMFM_MINECRAFT_JAVA_PROTOCOL_NUMBER_
 #define _NSMFM_MINECRAFT_JAVA_PROTOCOL_NUMBER_
 
-bool nsmfm_is_known_protocol(int var);
+bool isKnownMinecraftProtocolNumber(int var);
 
 #define MINECRAFT_1_7    3
 #define MINECRAFT_1_7_1  3

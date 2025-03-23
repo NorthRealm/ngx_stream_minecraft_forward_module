@@ -31,7 +31,7 @@ NSMFM_PREREAD_SRCS="$NSMFM_SRCDIR/preread/ngx_stream_minecraft_forward_preread_m
 $NSMFM_SRCDIR/preread/nsmfpm_session.cpp"
 
 NSMFM_FILTER_SRCS="$NSMFM_SRCDIR/filter/ngx_stream_minecraft_forward_content_filter_module.cpp \
-$NSMFM_SRCDIR/filter/nsmfcfm_session.c"
+$NSMFM_SRCDIR/filter/nsmfcfm_session.cpp"
 
 NSMFM_SRCS="$NSMFM_MAIN_SRCS $NSMFM_PREREAD_SRCS $NSMFM_FILTER_SRCS $NSMFM_DEP_SRCS"
 

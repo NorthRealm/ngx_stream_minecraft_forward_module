@@ -1,11 +1,11 @@
 #include "nsmfm_uuid.hpp"
 
-MinecraftUUID* MinecraftUUID::create(u_char *bufpos) {
+MinecraftUUID* MinecraftUUID::create(u_char *buf) {
     MinecraftUUID  *res;
     u_char          uuid[_MC_UUID_LITERAL_LEN_ + 1];
 
     for (int i = 0; i < _MC_UUID_LITERAL_LEN_; ++i) {
-        uuid[i] = i % 2 ? (bufpos[i / 2] & (u_char)0x0F) : ((bufpos[i / 2] & (u_char)0xF0) >> 4);
+        uuid[i] = i % 2 ? (buf[i / 2] & (u_char)0x0F) : ((buf[i / 2] & (u_char)0xF0) >> 4);
 
         if (uuid[i] <= 9) {
             uuid[i] += '0';

@@ -1,7 +1,7 @@
 #include "nsmfm_varint.hpp"
 
-int MinecraftVarint::parse(u_char *buf, int *bytes_length) {
-    if (buf == NULL) {
+int MinecraftVarint::parse(u_char *buf, int *bytesLength) {
+    if (!buf) {
         return -1;
     }
 
@@ -37,27 +37,27 @@ int MinecraftVarint::parse(u_char *buf, int *bytes_length) {
         return -1;
     }
 
-    if (bytes_length != NULL) {
-        *bytes_length = (int)(pos - buf) + 1;
+    if (bytesLength) {
+        *bytesLength = (int)(pos - buf) + 1;
     }
 
     return value;
 }
 
-MinecraftVarint* MinecraftVarint::create(int value) {
+MinecraftVarint* MinecraftVarint::create(int num) {
     u_char  buf[_MC_VARINT_MAX_BYTE_LEN_];
 
     int count = 0;
 
     for (;;) {
-        if ((value & ~0x7F) == 0) {
-            buf[count++] = value;
+        if ((num & ~0x7F) == 0) {
+            buf[count++] = num;
             break;
         }
 
-        buf[count++] = ((value & 0x7F) | 0x80);
+        buf[count++] = ((num & 0x7F) | 0x80);
 
-        value >>= 7;
+        num >>= 7;
     }
 
     return new MinecraftVarint(buf, count);

@@ -7,10 +7,10 @@ extern "C"
 #include "ngx_stream_minecraft_forward_module.h"
 }
 
-static void *nsmfm_create_srv_conf(ngx_conf_t *cf);
-static char *nsmfm_merge_srv_conf(ngx_conf_t *cf, void *prev, void *conf);
+static void *mainModuleCreateServerConf(ngx_conf_t *cf);
+static char *mainModuleMergeServerConf(ngx_conf_t *cf, void *prev, void *conf);
 
-static char *nsmfm_srv_conf_minecraft_server_hostname(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+static char *main_module_minecraft_server_hostname_directive(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
 #define _NGX_STREAM_MC_FORWARD_MODULE_DEFAULT_HASH_MAX_SIZE_ 512
 #define _NGX_STREAM_MC_FORWARD_MODULE_DEFAULT_HASH_BUCKET_SIZE_ 64
@@ -20,11 +20,11 @@ static ngx_command_t nsmfm_directives[] = {
      NGX_STREAM_SRV_CONF | NGX_CONF_FLAG,
      ngx_conf_set_flag_slot,
      NGX_STREAM_SRV_CONF_OFFSET,
-     offsetof(nsmfm_srv_conf_t, enabled),
+     offsetof(MinecraftForwardModuleServerConf, enabled),
      NULL},
     {ngx_string("minecraft_server_hostname"),
      NGX_STREAM_MAIN_CONF | NGX_STREAM_SRV_CONF | NGX_CONF_TAKE23,
-     nsmfm_srv_conf_minecraft_server_hostname,
+     main_module_minecraft_server_hostname_directive,
      NGX_STREAM_SRV_CONF_OFFSET,
      0,
      NULL},
@@ -32,25 +32,25 @@ static ngx_command_t nsmfm_directives[] = {
      NGX_STREAM_MAIN_CONF | NGX_STREAM_SRV_CONF | NGX_CONF_TAKE1,
      ngx_conf_set_size_slot,
      NGX_STREAM_SRV_CONF_OFFSET,
-     offsetof(nsmfm_srv_conf_t, hash_max_size),
+     offsetof(MinecraftForwardModuleServerConf, hash_max_size),
      NULL},
     {ngx_string("minecraft_server_hostname_hash_bucket_size"),
      NGX_STREAM_MAIN_CONF | NGX_STREAM_SRV_CONF | NGX_CONF_TAKE1,
      ngx_conf_set_size_slot,
      NGX_STREAM_SRV_CONF_OFFSET,
-     offsetof(nsmfm_srv_conf_t, hash_bucket_size),
+     offsetof(MinecraftForwardModuleServerConf, hash_bucket_size),
      NULL},
     {ngx_string("minecraft_server_hostname_disconnect_on_nomatch"),
      NGX_STREAM_MAIN_CONF | NGX_STREAM_SRV_CONF | NGX_CONF_FLAG,
      ngx_conf_set_flag_slot,
      NGX_STREAM_SRV_CONF_OFFSET,
-     offsetof(nsmfm_srv_conf_t, disconnect_on_nomatch),
+     offsetof(MinecraftForwardModuleServerConf, disconnect_on_nomatch),
      NULL},
     {ngx_string("minecraft_server_hostname_replace_on_ping"),
      NGX_STREAM_MAIN_CONF | NGX_STREAM_SRV_CONF | NGX_CONF_FLAG,
      ngx_conf_set_flag_slot,
      NGX_STREAM_SRV_CONF_OFFSET,
-     offsetof(nsmfm_srv_conf_t, replace_on_ping),
+     offsetof(MinecraftForwardModuleServerConf, replace_on_ping),
      NULL},
     ngx_null_command,
 };
@@ -62,8 +62,8 @@ static ngx_stream_module_t nsmfm_conf_ctx = {
     NULL, /* create main configuration */
     NULL, /* init main configuration */
 
-    nsmfm_create_srv_conf, /* create server configuration */
-    nsmfm_merge_srv_conf   /* merge server configuration */
+    mainModuleCreateServerConf, /* create server configuration */
+    mainModuleMergeServerConf   /* merge server configuration */
 };
 
 ngx_module_t ngx_stream_minecraft_forward_module = {
@@ -81,19 +81,20 @@ ngx_module_t ngx_stream_minecraft_forward_module = {
     NGX_MODULE_V1_PADDING  /* No padding */
 };
 
-static void *nsmfm_create_srv_conf(ngx_conf_t *cf) {
+static void *mainModuleCreateServerConf(ngx_conf_t *cf) {
     ngx_int_t         rc;
-    nsmfm_srv_conf_t *conf;
+    
+    MinecraftForwardModuleServerConf  *conf;
 
-    conf = (nsmfm_srv_conf_t *) ngx_pcalloc(cf->pool, sizeof(nsmfm_srv_conf_t));
-    if (conf == NULL) {
+    conf = (MinecraftForwardModuleServerConf *)ngx_pcalloc(cf->pool, sizeof(MinecraftForwardModuleServerConf));
+    if (!conf) {
         return NULL;
     }
 
     conf->enabled = NGX_CONF_UNSET;
     conf->disconnect_on_nomatch = NGX_CONF_UNSET;
 
-    conf->hostname_map_init.hash = &conf->hostname_map;
+    conf->hostname_map_init.hash = &conf->hostnames;
     conf->hostname_map_init.key = ngx_hash_key_lc;
     conf->hostname_map_init.name = (char *)"minecraft_server_hostname";
     conf->hostname_map_init.pool = cf->pool;
@@ -115,7 +116,7 @@ static void *nsmfm_create_srv_conf(ngx_conf_t *cf) {
     return conf;
 }
 
-static char *nsmfm_srv_conf_minecraft_server_hostname(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
+static char *main_module_minecraft_server_hostname_directive(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
     ngx_int_t   rc;
     ngx_str_t  *values;
     ngx_str_t  *read_key;
@@ -123,9 +124,9 @@ static char *nsmfm_srv_conf_minecraft_server_hostname(ngx_conf_t *cf, ngx_comman
 
     u_char     *val;
 
-    nsmfm_srv_conf_t *sc = (nsmfm_srv_conf_t *) conf;
+    MinecraftForwardModuleServerConf *sc = (MinecraftForwardModuleServerConf *)conf;
 
-    values = (ngx_str_t *) cf->args->elts;
+    values = (ngx_str_t *)cf->args->elts;
 
     read_key = &values[1];
     read_val = &values[2];
@@ -134,7 +135,7 @@ static char *nsmfm_srv_conf_minecraft_server_hostname(ngx_conf_t *cf, ngx_comman
     ngx_conf_log_error(NGX_LOG_WARN, cf, 0, "minecraft_server_hostname: %s - %s", read_key->data, read_val->data);
 #endif
 
-    val = (u_char *) ngx_pnalloc(cf->pool, (read_val->len + 1) * sizeof(u_char));
+    val = (u_char *)ngx_pnalloc(cf->pool, (read_val->len + 1) * sizeof(u_char));
     ngx_memcpy(val, read_val->data, read_val->len);
     val[read_val->len] = 0;
 
@@ -148,17 +149,18 @@ static char *nsmfm_srv_conf_minecraft_server_hostname(ngx_conf_t *cf, ngx_comman
     return (char *)NGX_CONF_OK;
 }
 
-static char *nsmfm_merge_srv_conf(ngx_conf_t *cf, void *prev, void *conf) {
-    ngx_int_t          rc;
-    nsmfm_srv_conf_t  *pconf;
-    nsmfm_srv_conf_t  *cconf;
+static char *mainModuleMergeServerConf(ngx_conf_t *cf, void *prev, void *conf) {
+    MinecraftForwardModuleServerConf  *pconf;
+    MinecraftForwardModuleServerConf  *cconf;
 
-    ngx_str_t         *key;
-    ngx_uint_t         hashed_key;
-    u_char            *val;
+    ngx_str_t   *key;
+    ngx_uint_t   hashed_key;
+    u_char      *val;
 
-    pconf = (nsmfm_srv_conf_t *) prev;
-    cconf = (nsmfm_srv_conf_t *) conf;
+    ngx_int_t    rc;
+
+    pconf = (MinecraftForwardModuleServerConf *)prev;
+    cconf = (MinecraftForwardModuleServerConf *)conf;
 
     ngx_conf_merge_value(cconf->enabled, pconf->enabled, 0);
     ngx_conf_merge_value(cconf->disconnect_on_nomatch, pconf->disconnect_on_nomatch, 0);
@@ -196,9 +198,9 @@ static char *nsmfm_merge_srv_conf(ngx_conf_t *cf, void *prev, void *conf) {
 
         hashed_key = ngx_hash_key(key->data, key->len);
 
-        val = (u_char *)ngx_hash_find(&pconf->hostname_map, hashed_key, key->data, key->len);
+        val = (u_char *)ngx_hash_find(&pconf->hostnames, hashed_key, key->data, key->len);
 
-        if (val == NULL) {
+        if (!val) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "A hash key previously in stream context becomes missing?! This should not happen");
             return (char *)NGX_CONF_ERROR;

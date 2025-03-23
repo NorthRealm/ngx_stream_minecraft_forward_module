@@ -13,16 +13,17 @@ extern "C"
 class MinecraftVarint {
 public:
     u_char bytes[_MC_VARINT_MAX_BYTE_LEN_];
-    int    bytes_length : 3;
+    /* The varint itself also has a length. */
+    int    bytesLength : 3;
     
     static int parse(u_char *buf, int *bytes_length);
     static MinecraftVarint* create(int value);
 
-    MinecraftVarint(u_char *bytes, int bytes_length) {
+    MinecraftVarint(u_char *bytes, int bytesLength) {
         if (bytes) {
-            ngx_memcpy(this->bytes, bytes, bytes_length);
+            ngx_memcpy(this->bytes, bytes, bytesLength);
         }
-        this->bytes_length = bytes_length;
+        this->bytesLength = bytesLength;
     }
 
     MinecraftVarint() : MinecraftVarint(NULL, 0) {}

@@ -3,22 +3,22 @@ extern "C"
 #include <ngx_core.h>
 #include <ngx_stream.h>
 #include "../main/ngx_stream_minecraft_forward_module.h"
-#include "../filter/nsmfcfm_session.h"
 }
+#include "../filter/nsmfcfm_session.hpp"
 #include "../protocol/nsmfm_protocol_number.hpp"
 #include "nsmfpm_session.hpp"
 #include "../packet/nsmfm_packet.hpp"
 #include "../protocol/nsmfm_varint.hpp"
 
-static ngx_int_t nsmfpm_post_init(ngx_conf_t *cf);
+static ngx_int_t prereadModulePostInit(ngx_conf_t *cf);
 
-static ngx_int_t nsmfpm(ngx_stream_session_t *s);
-static ngx_int_t nsmfpm_handshake(ngx_stream_session_t *s);
-static ngx_int_t nsmfpm_loginstart(ngx_stream_session_t *s);
+static ngx_int_t prereadModulePacketHandler(ngx_stream_session_t *s);
+static ngx_int_t prereadModuleHandshakePacketHandler(ngx_stream_session_t *s);
+static ngx_int_t prereadModuleLoginstartPacketHandler(ngx_stream_session_t *s);
 
 static ngx_stream_module_t nsmfpm_conf_ctx = {
     NULL,  /* preconfiguration */
-    nsmfpm_post_init, /* postconfiguration */
+    prereadModulePostInit, /* postconfiguration */
 
     NULL, /* create main configuration */
     NULL, /* init main configuration */
@@ -42,12 +42,12 @@ ngx_module_t ngx_stream_minecraft_forward_preread_module = {
     NGX_MODULE_V1_PADDING  /* No padding */
 };
 
-static ngx_int_t nsmfpm(ngx_stream_session_t *s) {
-    ngx_connection_t        *c;
-    nsmfm_srv_conf_t        *sconf;
-    nsmfpm_session_context  *ctx;
+static ngx_int_t prereadModulePacketHandler(ngx_stream_session_t *s) {
+    MinecraftForwardModuleServerConf  *sconf;
+    PrereadModuleSessionContext       *ctx;
 
-    ngx_int_t                rc;
+    ngx_connection_t  *c;
+    ngx_int_t          rc;
 
     c = s->connection;
 
@@ -55,23 +55,23 @@ static ngx_int_t nsmfpm(ngx_stream_session_t *s) {
         return NGX_DECLINED;
     }
 
-    sconf = (nsmfm_srv_conf_t *) ngx_stream_get_module_srv_conf(s, ngx_stream_minecraft_forward_module);
+    sconf = (MinecraftForwardModuleServerConf *)ngx_stream_get_module_srv_conf(s, ngx_stream_minecraft_forward_module);
     if (!sconf->enabled) {
         return NGX_DECLINED;
     }
 
-    c->log->action = (char *) "prereading minecraft packet";
+    c->log->action = (char *)"prereading minecraft packet";
 
-    if (c->buffer == NULL) {
+    if (!c->buffer) {
         return NGX_AGAIN;
     }
 
-    if (!nsmfpm_create_session_context(s)) {
+    if (!prereadCreateSessionContext(s)) {
         return NGX_ERROR;
     }
-    ctx = nsmfpm_get_session_context(s);
+    ctx = prereadGetSessionContext(s);
     if (!ctx->handler) {
-        ctx->handler = nsmfpm_handshake;
+        ctx->handler = prereadModuleHandshakePacketHandler;
     }
 
     if (ctx->pass) {
@@ -87,8 +87,8 @@ static ngx_int_t nsmfpm(ngx_stream_session_t *s) {
 
 end_of_preread:
     if (ctx->fail) {
-        nsmfpm_remove_session_context(s);
-        nsmfcfm_remove_session_context(s);
+        prereadRemoveSessionContext(s);
+        filterRemoveSessionContext(s);
         ngx_log_error(NGX_LOG_ERR, c->log, 0, "Preread failed");
         rc = NGX_ERROR;
     }
@@ -100,28 +100,28 @@ preread_failure:
     goto end_of_preread;
 }
 
-static ngx_int_t nsmfpm_handshake(ngx_stream_session_t *s) {
-    ngx_connection_t         *c;
-    nsmfpm_session_context   *ctx;
-    nsmfcfm_session_context  *cfctx;
+static ngx_int_t prereadModuleHandshakePacketHandler(ngx_stream_session_t *s) {
+    PrereadModuleSessionContext   *ctx;
+    FilterModuleSessionContext  *cfctx;
 
-    u_char                   *bufpos;
-    ngx_int_t                 rc;
-    int                       parse_var;
-    int                       varint_byte_len;
-    u_char                    port_char;
+    MinecraftHandshake  *handshake;
 
-    ngx_flag_t                buffer_remanent;
+    ngx_connection_t  *c;
+    u_char            *bufpos;
+    ngx_int_t          rc;
+    int                parse_var;
+    int                varint_byte_len;
+    u_char             port_char;
 
-    MinecraftHandshake       *handshake;
+    ngx_flag_t         buffer_remanent;
 
     c = s->connection;
-    c->log->action = (char *) "prereading minecraft handshake packet";
+    c->log->action = (char *)"prereading minecraft handshake packet";
 #if (NGX_DEBUG)
     ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0, "Prereading minecraft handshake packet");
 #endif
 
-    ctx = (nsmfpm_session_context *) nsmfpm_get_session_context(s);
+    ctx = (PrereadModuleSessionContext *)prereadGetSessionContext(s);
 
     if (!ctx->handshake) {
         ctx->handshake = new MinecraftHandshake(ctx->pool);
@@ -139,7 +139,7 @@ static ngx_int_t nsmfpm_handshake(ngx_stream_session_t *s) {
         return NGX_ERROR;
     }
     if (parse_var == 0) {
-        rc = handshake->determine_length(s, &bufpos, c->buffer->last);
+        rc = handshake->determineLength(s, &bufpos, c->buffer->last);
         if (rc != NGX_OK) {
             return rc;
         }
@@ -152,7 +152,7 @@ static ngx_int_t nsmfpm_handshake(ngx_stream_session_t *s) {
     bufpos = ctx->bufpos;
 
     if (!handshake->content) {
-        rc = handshake->determine_content(s, &bufpos, c->buffer->last);
+        rc = handshake->determineContent(s, &bufpos, c->buffer->last);
         if (rc != NGX_OK) {
             return rc;
         }
@@ -166,10 +166,10 @@ static ngx_int_t nsmfpm_handshake(ngx_stream_session_t *s) {
             ctx->handler = NULL;
             ctx->pass = true;
 
-            if (!nsmfcfm_create_session_context(s)) {
+            if (!filterCreateSessionContext(s)) {
                 return NGX_ERROR;
             }
-            cfctx = nsmfcfm_get_session_context(s);
+            cfctx = filterGetSessionContext(s);
 
             cfctx->in = ngx_alloc_chain_link(cfctx->pool);
 
@@ -177,7 +177,7 @@ static ngx_int_t nsmfpm_handshake(ngx_stream_session_t *s) {
                 return NGX_ERROR;
             }
 
-            parse_var = handshake->length->bytes_length + MinecraftVarint::parse(handshake->length->bytes, NULL);
+            parse_var = handshake->length->bytesLength + MinecraftVarint::parse(handshake->length->bytes, NULL);
 
             buffer_remanent = c->buffer->last - c->buffer->start > (ssize_t)parse_var;
 
@@ -189,17 +189,17 @@ static ngx_int_t nsmfpm_handshake(ngx_stream_session_t *s) {
             }
 
             cfctx->in->buf->last = ngx_cpymem(cfctx->in->buf->last,
-                handshake->length->bytes, handshake->length->bytes_length);
+                handshake->length->bytes, handshake->length->bytesLength);
             
             cfctx->in->buf->last = ngx_cpymem(cfctx->in->buf->last,
-                handshake->id->bytes, handshake->id->bytes_length);
+                handshake->id->bytes, handshake->id->bytesLength);
             
             cfctx->in->buf->last = ngx_cpymem(cfctx->in->buf->last,
-                handshake->protocol_number->bytes, handshake->protocol_number->bytes_length);
+                handshake->protocol_number->bytes, handshake->protocol_number->bytesLength);
             
             cfctx->in->buf->last = ngx_cpymem(cfctx->in->buf->last,
                 handshake->server_address->length->bytes,
-                handshake->server_address->length->bytes_length);
+                handshake->server_address->length->bytesLength);
             
             cfctx->in->buf->last = ngx_cpymem(cfctx->in->buf->last,
                 handshake->server_address->content,
@@ -211,7 +211,7 @@ static ngx_int_t nsmfpm_handshake(ngx_stream_session_t *s) {
             cfctx->in->buf->last = ngx_cpymem(cfctx->in->buf->last, &port_char, 1);
             
             cfctx->in->buf->last = ngx_cpymem(cfctx->in->buf->last,
-                handshake->next_state->bytes, handshake->next_state->bytes_length);
+                handshake->next_state->bytes, handshake->next_state->bytesLength);
 
             if (buffer_remanent) {
                 cfctx->in->buf->last = ngx_cpymem(cfctx->in->buf->last,
@@ -233,7 +233,7 @@ static ngx_int_t nsmfpm_handshake(ngx_stream_session_t *s) {
 #if (NGX_DEBUG)
             ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0, "Finish prereading handshake packet. Next state login.");
 #endif
-            ctx->handler = nsmfpm_loginstart;
+            ctx->handler = prereadModuleLoginstartPacketHandler;
             ctx->bufpos = bufpos;
             break;
         case _MC_HANDSHAKE_TRANSFER_STATE_:
@@ -247,31 +247,31 @@ static ngx_int_t nsmfpm_handshake(ngx_stream_session_t *s) {
     return NGX_AGAIN;
 }
 
-static ngx_int_t nsmfpm_loginstart(ngx_stream_session_t *s) {
-    ngx_connection_t         *c;
-    nsmfpm_session_context   *ctx;
-    nsmfcfm_session_context  *cfctx;
+static ngx_int_t prereadModuleLoginstartPacketHandler(ngx_stream_session_t *s) {
+    PrereadModuleSessionContext  *ctx;
+    FilterModuleSessionContext   *cfctx;
 
-    u_char                   *bufpos;
-    ngx_int_t                 rc;
-    int                       parse_var;
-    int                       varint_byte_len;
+    MinecraftHandshake   *handshake;
+    MinecraftLoginstart  *loginstart;
 
-    MinecraftHandshake       *handshake;
-    MinecraftLoginstart      *loginstart;
+    ngx_connection_t  *c;
+    u_char            *bufpos;
+    ngx_int_t          rc;
+    int                parse_var;
+    int                varint_byte_len;
 
     c = s->connection;
-    c->log->action = (char *) "prereading minecraft loginstart packet";
+    c->log->action = (char *)"prereading minecraft loginstart packet";
 #if (NGX_DEBUG)
     ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0, "Prereading minecraft loginstart packet");
 #endif
 
-    ctx = (nsmfpm_session_context *) nsmfpm_get_session_context(s);
+    ctx = (PrereadModuleSessionContext *)prereadGetSessionContext(s);
 
-    if (!nsmfcfm_create_session_context(s)) {
+    if (!filterCreateSessionContext(s)) {
         return NGX_ERROR;
     }
-    cfctx = nsmfcfm_get_session_context(s);
+    cfctx = filterGetSessionContext(s);
 
     if (!ctx->loginstart) {
         ctx->loginstart = new MinecraftLoginstart(ctx->pool);
@@ -289,7 +289,7 @@ static ngx_int_t nsmfpm_loginstart(ngx_stream_session_t *s) {
         return NGX_ERROR;
     }
     if (parse_var == 0) {
-        rc = loginstart->determine_length(s, &bufpos, c->buffer->last);
+        rc = loginstart->determineLength(s, &bufpos, c->buffer->last);
         if (rc != NGX_OK) {
             return rc;
         }
@@ -302,7 +302,7 @@ static ngx_int_t nsmfpm_loginstart(ngx_stream_session_t *s) {
     bufpos = ctx->bufpos;
 
     if (!loginstart->content) {
-        rc = loginstart->determine_content(s, &bufpos, c->buffer->last);
+        rc = loginstart->determineContent(s, &bufpos, c->buffer->last);
         if (rc != NGX_OK) {
             return rc;
         }
@@ -316,8 +316,8 @@ static ngx_int_t nsmfpm_loginstart(ngx_stream_session_t *s) {
         return NGX_ERROR;
     }
 
-    parse_var = handshake->length->bytes_length + MinecraftVarint::parse(handshake->length->bytes, NULL) +
-        loginstart->length->bytes_length + MinecraftVarint::parse(loginstart->length->bytes, NULL);
+    parse_var = handshake->length->bytesLength + MinecraftVarint::parse(handshake->length->bytes, NULL) +
+        loginstart->length->bytesLength + MinecraftVarint::parse(loginstart->length->bytes, NULL);
 
     cfctx->in->buf = ngx_create_temp_buf(cfctx->pool, parse_var);
 
@@ -334,16 +334,16 @@ static ngx_int_t nsmfpm_loginstart(ngx_stream_session_t *s) {
     return NGX_OK;
 }
 
-static ngx_int_t nsmfpm_post_init(ngx_conf_t *cf) {
+static ngx_int_t prereadModulePostInit(ngx_conf_t *cf) {
     ngx_stream_handler_pt       *hp;
     ngx_stream_core_main_conf_t *cmcf;
 
-    cmcf = (ngx_stream_core_main_conf_t *) ngx_stream_conf_get_module_main_conf(cf, ngx_stream_core_module);
-    hp = (ngx_stream_handler_pt *) ngx_array_push(&cmcf->phases[NGX_STREAM_PREREAD_PHASE].handlers);
-    if (hp == NULL) {
+    cmcf = (ngx_stream_core_main_conf_t *)ngx_stream_conf_get_module_main_conf(cf, ngx_stream_core_module);
+    hp = (ngx_stream_handler_pt *)ngx_array_push(&cmcf->phases[NGX_STREAM_PREREAD_PHASE].handlers);
+    if (!hp) {
         return NGX_ERROR;
     }
-    *hp = nsmfpm;
+    *hp = prereadModulePacketHandler;
 
     return NGX_OK;
 }
