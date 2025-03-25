@@ -1,0 +1,63 @@
+name: "CodeQL Advanced"
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+  schedule:
+    - cron: '0 0 * * 0'
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - language: actions
+          build-mode: none
+        - language: c-cpp
+          build-mode: manual
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup Nginx
+      id: setup-nginx
+      if: ${{ matrix.language == 'c-cpp' }}
+      run: |
+        echo "repo_dir=$(pwd)" >> $GITHUB_OUTPUT
+        git clone https://github.com/nginx/nginx.git nginx-src
+        cd nginx-src
+        cp auto/configure .
+        chmod +x configure
+        echo "working_dir=$(pwd)" >> $GITHUB_OUTPUT
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+        build-mode: ${{ matrix.build-mode }}
+
+    - name: Manual build
+      if: ${{ matrix.language == 'c-cpp' && matrix.build-mode == 'manual' }}
+      shell: bash
+      working-directory: ${{ steps.setup-nginx.outputs.working_dir }}
+      run: |
+        ./configure --add-module=${{ steps.setup-nginx.outputs.repo_dir }} --without-http --with-stream --with-debug
+        make
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{matrix.language}}"
