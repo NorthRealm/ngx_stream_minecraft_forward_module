@@ -49,16 +49,17 @@ public:
 
 class MinecraftPacket {
 public:
-    MinecraftVarint  *id;
-    MinecraftVarint  *length;
-    u_char           *content;
     ngx_pool_t       *pool;
+    MinecraftVarint  *id;
+    /* Modern Minecraft packet is prefixed by a varint indicating length of Packet ID + Actual payload */
+    MinecraftVarint  *length;
+    u_char           *payload;
 
     MinecraftPacket(int id, ngx_pool_t *pool) {
         this->length = MinecraftVarint::create(0);
         this->id = MinecraftVarint::create(id);
         this->pool = pool;
-        this->content = NULL;
+        this->payload = NULL;
     }
 
     MinecraftPacket() : MinecraftPacket(0, NULL) {}
@@ -72,46 +73,46 @@ public:
             delete id;
             id = nullptr;
         }
-        if (pool && content) {
-            ngx_pfree(pool, content);
-            content = NULL;
+        if (pool && payload) {
+            ngx_pfree(pool, payload);
+            payload = NULL;
         }
     }
 
     ngx_int_t determineLength(ngx_stream_session_t *s, u_char **bufpos, u_char *buflast);
-    ngx_int_t determineContent(ngx_stream_session_t *s, u_char *bufpos, u_char *buflast);
+    ngx_int_t determinePayload(ngx_stream_session_t *s, u_char *bufpos, u_char *buflast);
 };
 
 class MinecraftHandshake : public MinecraftPacket {
 public:
-    MinecraftVarint  *protocol_number;
-    MinecraftString  *server_address;
-    u_short           server_port;
-    MinecraftVarint  *next_state;
+    MinecraftVarint  *protocolNumber;
+    MinecraftString  *serverAddress;
+    u_short           serverPort;
+    MinecraftVarint  *nextState;
 
     MinecraftHandshake(ngx_pool_t *pool) : MinecraftPacket(_MC_HANDSHAKE_PACKET_ID_, pool) {
-        this->protocol_number = NULL;
-        this->server_address = NULL;
-        this->next_state = NULL;
-        this->server_port = 0;
+        this->protocolNumber = NULL;
+        this->serverAddress = NULL;
+        this->nextState = NULL;
+        this->serverPort = 0;
     }
 
     ~MinecraftHandshake() {
-        if (protocol_number) {
-            delete protocol_number;
-            protocol_number = nullptr;
+        if (protocolNumber) {
+            delete protocolNumber;
+            protocolNumber = nullptr;
         }
-        if (server_address) {
-            delete server_address;
-            server_address = nullptr;
+        if (serverAddress) {
+            delete serverAddress;
+            serverAddress = nullptr;
         }
-        if (next_state) {
-            delete next_state;
-            next_state = nullptr;
+        if (nextState) {
+            delete nextState;
+            nextState = nullptr;
         }
     }
 
-    static ngx_int_t determineContent(ngx_stream_session_t *s, u_char **bufpos, u_char *buflast);
+    static ngx_int_t determinePayload(ngx_stream_session_t *s, u_char **bufpos, u_char *buflast);
 };
 
 class MinecraftLoginstart : public MinecraftPacket {
@@ -135,7 +136,7 @@ public:
         }
     }
 
-    static ngx_int_t determineContent(ngx_stream_session_t *s, u_char **bufpos, u_char *buflast);
+    static ngx_int_t determinePayload(ngx_stream_session_t *s, u_char **bufpos, u_char *buflast);
 };
 
 #endif

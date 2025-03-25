@@ -1,4 +1,4 @@
-#include "nsmfm_protocol_number.hpp"
+#include "nsmfm_protocolNumber.hpp"
 
 bool isKnownMinecraftProtocolNumber(int var) {
     switch (var) {

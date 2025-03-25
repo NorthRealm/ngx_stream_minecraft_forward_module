@@ -16,7 +16,7 @@ public:
     /* The varint itself also has a length. */
     int    bytesLength : 3;
     
-    static int parse(u_char *buf, int *bytes_length);
+    static int parse(u_char *buf, int *bytesLength);
     static MinecraftVarint* create(int value);
 
     MinecraftVarint(u_char *bytes, int bytesLength) {

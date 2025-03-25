@@ -12,8 +12,8 @@ extern "C"
 typedef ngx_int_t (*FilterModuleHandler)(ngx_stream_session_t *s, ngx_chain_t *in);
 
 typedef struct {
-    bool          pinged;
-    bool          fail;
+    ngx_flag_t    pinged;
+    ngx_flag_t    fail;
 
     ngx_chain_t  *in;
     ngx_chain_t  *out;

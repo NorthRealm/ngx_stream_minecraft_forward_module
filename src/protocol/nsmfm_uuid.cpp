@@ -2,9 +2,9 @@
 
 MinecraftUUID* MinecraftUUID::create(u_char *buf) {
     MinecraftUUID  *res;
-    u_char          uuid[_MC_UUID_LITERAL_LEN_ + 1];
+    u_char          uuid[_MC_UUID_LITERAL_NO_DASH_LEN_ + 1];
 
-    for (int i = 0; i < _MC_UUID_LITERAL_LEN_; ++i) {
+    for (int i = 0; i < _MC_UUID_LITERAL_NO_DASH_LEN_; ++i) {
         uuid[i] = i % 2 ? (buf[i / 2] & (u_char)0x0F) : ((buf[i / 2] & (u_char)0xF0) >> 4);
 
         if (uuid[i] <= 9) {
@@ -15,10 +15,10 @@ MinecraftUUID* MinecraftUUID::create(u_char *buf) {
             return nullptr;
         }
     }
-    uuid[_MC_UUID_LITERAL_LEN_] = 0;
+    uuid[_MC_UUID_LITERAL_NO_DASH_LEN_] = 0;
 
     res = new MinecraftUUID();
-    ngx_memcpy(res->literals, uuid, _MC_UUID_LITERAL_LEN_ + 1);
+    ngx_memcpy(res->literals, uuid, _MC_UUID_LITERAL_NO_DASH_LEN_ + 1);
 
     return res;
 }

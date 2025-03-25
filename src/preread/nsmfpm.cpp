@@ -2,10 +2,10 @@ extern "C"
 {
 #include <ngx_core.h>
 #include <ngx_stream.h>
-#include "../main/ngx_stream_minecraft_forward_module.h"
+#include "../main/nsmfm.h"
 }
 #include "../filter/nsmfcfm_session.hpp"
-#include "../protocol/nsmfm_protocol_number.hpp"
+#include "../protocol/nsmfm_protocolNumber.hpp"
 #include "nsmfpm_session.hpp"
 #include "../packet/nsmfm_packet.hpp"
 #include "../protocol/nsmfm_varint.hpp"
@@ -101,130 +101,137 @@ preread_failure:
 }
 
 static ngx_int_t prereadModuleHandshakePacketHandler(ngx_stream_session_t *s) {
-    PrereadModuleSessionContext   *ctx;
-    FilterModuleSessionContext  *cfctx;
+    PrereadModuleSessionContext  *prereadContext;
+    FilterModuleSessionContext   *filterContext;
 
     MinecraftHandshake  *handshake;
 
     ngx_connection_t  *c;
     u_char            *bufpos;
     ngx_int_t          rc;
-    int                parse_var;
-    int                varint_byte_len;
-    u_char             port_char;
-
-    ngx_flag_t         buffer_remanent;
+    ngx_flag_t         hasBufferRemanent;
+    
+    int                parsedInt;
+    int                varintLength;
+    
+    u_char             dummyPortNumberChar;
 
     c = s->connection;
     c->log->action = (char *)"prereading minecraft handshake packet";
+
 #if (NGX_DEBUG)
     ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0, "Prereading minecraft handshake packet");
 #endif
 
-    ctx = (PrereadModuleSessionContext *)prereadGetSessionContext(s);
+    prereadContext = (PrereadModuleSessionContext *)prereadGetSessionContext(s);
+    if (!prereadContext->buf) {
+        prereadContext->buf = c->buffer;
+    }
 
-    if (!ctx->handshake) {
-        ctx->handshake = new MinecraftHandshake(ctx->pool);
-        if (!ctx->handshake) {
+    if (!prereadContext->handshake) {
+        prereadContext->handshake = new MinecraftHandshake(prereadContext->pool);
+        if (!prereadContext->handshake) {
             return NGX_ERROR;
         }
     }
-    handshake = ctx->handshake;
+    handshake = prereadContext->handshake;
 
-    bufpos = c->buffer->pos;
-    ctx->bufpos = bufpos;
+    bufpos = prereadContext->buf->pos;
+    prereadContext->bufpos = bufpos;
 
-    parse_var = MinecraftVarint::parse(handshake->length->bytes, NULL);
-    if (parse_var < 0) {
+    parsedInt = MinecraftVarint::parse(handshake->length->bytes, NULL);
+    if (parsedInt < 0) {
         return NGX_ERROR;
     }
-    if (parse_var == 0) {
+    if (parsedInt == 0) {
         rc = handshake->determineLength(s, &bufpos, c->buffer->last);
         if (rc != NGX_OK) {
             return rc;
         }
         
-        parse_var = MinecraftVarint::parse(handshake->length->bytes, NULL);
-        ngx_log_error(NGX_LOG_NOTICE, c->log, 0, "read varint, handshake content len: %d", parse_var);
-        ctx->bufpos = bufpos;
+        parsedInt = MinecraftVarint::parse(handshake->length->bytes, NULL);
+#if (NGX_DEBUG)
+        ngx_log_debug1(NGX_LOG_DEBUG_STREAM, c->log, 0, "read varint, handshake content len: %d", parsedInt);
+#endif
+        prereadContext->bufpos = bufpos;
     }
 
-    bufpos = ctx->bufpos;
+    bufpos = prereadContext->bufpos;
 
-    if (!handshake->content) {
-        rc = handshake->determineContent(s, &bufpos, c->buffer->last);
+    if (!handshake->payload) {
+        rc = handshake->determinePayload(s, &bufpos, c->buffer->last);
         if (rc != NGX_OK) {
             return rc;
         }
-        ctx->bufpos = bufpos;
+        prereadContext->bufpos = bufpos;
     }
 
-    bufpos = ctx->bufpos;
+    bufpos = prereadContext->bufpos;
 
-    switch (MinecraftVarint::parse(handshake->next_state->bytes, &varint_byte_len)) {
+    switch (MinecraftVarint::parse(handshake->nextState->bytes, &varintLength)) {
         case _MC_HANDSHAKE_STATUS_STATE_:
-            ctx->handler = NULL;
-            ctx->pass = true;
+            prereadContext->handler = NULL;
+            prereadContext->pass = 1;
 
             if (!filterCreateSessionContext(s)) {
                 return NGX_ERROR;
             }
-            cfctx = filterGetSessionContext(s);
+            filterContext = filterGetSessionContext(s);
 
-            cfctx->in = ngx_alloc_chain_link(cfctx->pool);
+            filterContext->in = ngx_alloc_chain_link(filterContext->pool);
 
-            if (!cfctx->in) {
+            if (!filterContext->in) {
                 return NGX_ERROR;
             }
 
-            parse_var = handshake->length->bytesLength + MinecraftVarint::parse(handshake->length->bytes, NULL);
+            parsedInt = handshake->length->bytesLength + MinecraftVarint::parse(handshake->length->bytes, NULL);
 
-            buffer_remanent = c->buffer->last - c->buffer->start > (ssize_t)parse_var;
+            hasBufferRemanent = c->buffer->last - c->buffer->start > (ssize_t)parsedInt;
 
-            varint_byte_len = buffer_remanent ? (c->buffer->last - c->buffer->start) : parse_var;
+            varintLength = hasBufferRemanent ? (c->buffer->last - c->buffer->start) : parsedInt;
 
-            cfctx->in->buf = ngx_create_temp_buf(cfctx->pool, varint_byte_len);
-            if (!cfctx->in->buf) {
+            filterContext->in->buf = ngx_create_temp_buf(filterContext->pool, varintLength);
+            if (!filterContext->in->buf) {
                 return NGX_ERROR;
             }
 
-            cfctx->in->buf->last = ngx_cpymem(cfctx->in->buf->last,
+            filterContext->in->buf->last = ngx_cpymem(filterContext->in->buf->last,
                 handshake->length->bytes, handshake->length->bytesLength);
             
-            cfctx->in->buf->last = ngx_cpymem(cfctx->in->buf->last,
+            filterContext->in->buf->last = ngx_cpymem(filterContext->in->buf->last,
                 handshake->id->bytes, handshake->id->bytesLength);
             
-            cfctx->in->buf->last = ngx_cpymem(cfctx->in->buf->last,
-                handshake->protocol_number->bytes, handshake->protocol_number->bytesLength);
+            filterContext->in->buf->last = ngx_cpymem(filterContext->in->buf->last,
+                handshake->protocolNumber->bytes, handshake->protocolNumber->bytesLength);
             
-            cfctx->in->buf->last = ngx_cpymem(cfctx->in->buf->last,
-                handshake->server_address->length->bytes,
-                handshake->server_address->length->bytesLength);
+            filterContext->in->buf->last = ngx_cpymem(filterContext->in->buf->last,
+                handshake->serverAddress->length->bytes,
+                handshake->serverAddress->length->bytesLength);
             
-            cfctx->in->buf->last = ngx_cpymem(cfctx->in->buf->last,
-                handshake->server_address->content,
-                MinecraftVarint::parse(handshake->server_address->length->bytes, NULL));
+            filterContext->in->buf->last = ngx_cpymem(filterContext->in->buf->last,
+                handshake->serverAddress->content,
+                MinecraftVarint::parse(handshake->serverAddress->length->bytes, NULL));
             
-            port_char = (handshake->server_port & 0xFF00) >> 8;
-            cfctx->in->buf->last = ngx_cpymem(cfctx->in->buf->last, &port_char, 1);
-            port_char = (handshake->server_port & 0x00FF);
-            cfctx->in->buf->last = ngx_cpymem(cfctx->in->buf->last, &port_char, 1);
+            dummyPortNumberChar = (handshake->serverPort & 0xFF00) >> 8;
+            filterContext->in->buf->last = ngx_cpymem(filterContext->in->buf->last, &dummyPortNumberChar, 1);
+            dummyPortNumberChar = (handshake->serverPort & 0x00FF);
+            filterContext->in->buf->last = ngx_cpymem(filterContext->in->buf->last, &dummyPortNumberChar, 1);
             
-            cfctx->in->buf->last = ngx_cpymem(cfctx->in->buf->last,
-                handshake->next_state->bytes, handshake->next_state->bytesLength);
+            filterContext->in->buf->last = ngx_cpymem(filterContext->in->buf->last,
+                handshake->nextState->bytes, handshake->nextState->bytesLength);
 
-            if (buffer_remanent) {
-                cfctx->in->buf->last = ngx_cpymem(cfctx->in->buf->last,
-                    c->buffer->start + parse_var,
-                    (c->buffer->last - c->buffer->start) - parse_var
+            if (hasBufferRemanent) {
+                filterContext->in->buf->last = ngx_cpymem(filterContext->in->buf->last,
+                    c->buffer->start + parsedInt,
+                    (c->buffer->last - c->buffer->start) - parsedInt
                 );
 #if (NGX_DEBUG)
-                ngx_log_debug1(NGX_LOG_DEBUG_STREAM, c->log, 0, "buf len: %d", ngx_buf_size(cfctx->in->buf));
+                ngx_log_debug1(NGX_LOG_DEBUG_STREAM, c->log, 0, "buf len: %d", ngx_buf_size(filterContext->in->buf));
 #endif
             }
 
-            cfctx->in->buf->last_buf = 1;
-            cfctx->in->next = NULL;
+            filterContext->in->buf->last_buf = 1;
+            filterContext->in->next = NULL;
 #if (NGX_DEBUG)
             ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0, "Finish prereading handshake packet. Next state status.");
 #endif
@@ -233,8 +240,8 @@ static ngx_int_t prereadModuleHandshakePacketHandler(ngx_stream_session_t *s) {
 #if (NGX_DEBUG)
             ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0, "Finish prereading handshake packet. Next state login.");
 #endif
-            ctx->handler = prereadModuleLoginstartPacketHandler;
-            ctx->bufpos = bufpos;
+            prereadContext->handler = prereadModuleLoginstartPacketHandler;
+            prereadContext->bufpos = bufpos;
             break;
         case _MC_HANDSHAKE_TRANSFER_STATE_:
             ngx_log_error(NGX_LOG_ALERT, c->log, 0, "Transfer state is not accepted");
@@ -248,8 +255,8 @@ static ngx_int_t prereadModuleHandshakePacketHandler(ngx_stream_session_t *s) {
 }
 
 static ngx_int_t prereadModuleLoginstartPacketHandler(ngx_stream_session_t *s) {
-    PrereadModuleSessionContext  *ctx;
-    FilterModuleSessionContext   *cfctx;
+    PrereadModuleSessionContext  *prereadContext;
+    FilterModuleSessionContext   *filterContext;
 
     MinecraftHandshake   *handshake;
     MinecraftLoginstart  *loginstart;
@@ -257,80 +264,84 @@ static ngx_int_t prereadModuleLoginstartPacketHandler(ngx_stream_session_t *s) {
     ngx_connection_t  *c;
     u_char            *bufpos;
     ngx_int_t          rc;
-    int                parse_var;
-    int                varint_byte_len;
+    
+    int                parsedInt;
+    int                varintLength;
 
     c = s->connection;
     c->log->action = (char *)"prereading minecraft loginstart packet";
+
 #if (NGX_DEBUG)
     ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0, "Prereading minecraft loginstart packet");
 #endif
 
-    ctx = (PrereadModuleSessionContext *)prereadGetSessionContext(s);
+    prereadContext = (PrereadModuleSessionContext *)prereadGetSessionContext(s);
 
     if (!filterCreateSessionContext(s)) {
         return NGX_ERROR;
     }
-    cfctx = filterGetSessionContext(s);
+    filterContext = filterGetSessionContext(s);
 
-    if (!ctx->loginstart) {
-        ctx->loginstart = new MinecraftLoginstart(ctx->pool);
-        if (!ctx->loginstart) {
+    if (!prereadContext->loginstart) {
+        prereadContext->loginstart = new MinecraftLoginstart(prereadContext->pool);
+        if (!prereadContext->loginstart) {
             return NGX_ERROR;
         }
     }
 
-    handshake = ctx->handshake;
-    loginstart = ctx->loginstart;
-    bufpos = ctx->bufpos;
+    handshake = prereadContext->handshake;
+    loginstart = prereadContext->loginstart;
+    bufpos = prereadContext->bufpos;
 
-    parse_var = MinecraftVarint::parse(loginstart->length->bytes, &varint_byte_len);
-    if (parse_var < 0) {
+    parsedInt = MinecraftVarint::parse(loginstart->length->bytes, &varintLength);
+    if (parsedInt < 0) {
         return NGX_ERROR;
     }
-    if (parse_var == 0) {
+    if (parsedInt == 0) {
         rc = loginstart->determineLength(s, &bufpos, c->buffer->last);
         if (rc != NGX_OK) {
             return rc;
         }
         
-        parse_var = MinecraftVarint::parse(loginstart->length->bytes, NULL);
-        ngx_log_error(NGX_LOG_NOTICE, c->log, 0, "read varint, loginstart content len: %d", parse_var);
-        ctx->bufpos = bufpos;
+        parsedInt = MinecraftVarint::parse(loginstart->length->bytes, NULL);
+#if (NGX_DEBUG)
+        ngx_log_debug1(NGX_LOG_DEBUG_STREAM, c->log, 0, "read varint, loginstart content len: %d", parsedInt);
+#endif
+        prereadContext->bufpos = bufpos;
     }
 
-    bufpos = ctx->bufpos;
+    bufpos = prereadContext->bufpos;
 
-    if (!loginstart->content) {
-        rc = loginstart->determineContent(s, &bufpos, c->buffer->last);
+    if (!loginstart->payload) {
+        rc = loginstart->determinePayload(s, &bufpos, c->buffer->last);
         if (rc != NGX_OK) {
             return rc;
         }
-        ctx->bufpos = bufpos;
+        prereadContext->bufpos = bufpos;
     }
 
-    bufpos = ctx->bufpos;
+    bufpos = prereadContext->bufpos;
 
-    cfctx->in = ngx_alloc_chain_link(cfctx->pool);
-    if (!cfctx->in) {
+    filterContext->in = ngx_alloc_chain_link(filterContext->pool);
+    if (!filterContext->in) {
         return NGX_ERROR;
     }
 
-    parse_var = handshake->length->bytesLength + MinecraftVarint::parse(handshake->length->bytes, NULL) +
+    parsedInt = handshake->length->bytesLength + MinecraftVarint::parse(handshake->length->bytes, NULL) +
         loginstart->length->bytesLength + MinecraftVarint::parse(loginstart->length->bytes, NULL);
 
-    cfctx->in->buf = ngx_create_temp_buf(cfctx->pool, parse_var);
+    filterContext->in->buf = ngx_create_temp_buf(filterContext->pool, parsedInt);
 
-    if (!cfctx->in->buf) {
+    if (!filterContext->in->buf) {
         return NGX_ERROR;
     }
 
-    cfctx->in->buf->last = ngx_cpymem(cfctx->in->buf->pos, c->buffer->pos, parse_var);
+    filterContext->in->buf->last = ngx_cpymem(filterContext->in->buf->pos, c->buffer->pos, parsedInt);
 
-    cfctx->in->buf->last_buf = 1;
-    cfctx->in->next = NULL;
+    filterContext->in->buf->last_buf = 1;
+    filterContext->in->next = NULL;
 
-    ctx->pass = true;
+    prereadContext->pass = 1;
     return NGX_OK;
 }
 

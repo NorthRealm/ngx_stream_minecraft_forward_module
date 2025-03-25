@@ -5,6 +5,7 @@ fi
 
 NSMFM_SRCDIR="src"
 NSMFM_SRCDIR="$ngx_addon_dir/$NSMFM_SRCDIR"
+
 NSMFM_MAIN="ngx_stream_minecraft_forward_module"
 NSMFM_FILTER="ngx_stream_minecraft_forward_content_filter_module"
 NSMFM_PREREAD="ngx_stream_minecraft_forward_preread_module"
@@ -17,20 +18,20 @@ $NSMFM_SRCDIR/protocol"
 
 NSMFM_DEPS="$NSMFM_SRCDIR/protocol/nsmfm_uuid.hpp \
 $NSMFM_SRCDIR/protocol/nsmfm_varint.hpp \
-$NSMFM_SRCDIR/protocol/nsmfm_protocol_number.hpp \
+$NSMFM_SRCDIR/protocol/nsmfm_protocolNumber.hpp \
 $NSMFM_SRCDIR/packet/nsmfm_packet.hpp"
 
 NSMFM_DEP_SRCS="$NSMFM_SRCDIR/protocol/nsmfm_uuid.cpp \
 $NSMFM_SRCDIR/protocol/nsmfm_varint.cpp \
-$NSMFM_SRCDIR/protocol/nsmfm_protocol_number.cpp \
+$NSMFM_SRCDIR/protocol/nsmfm_protocolNumber.cpp \
 $NSMFM_SRCDIR/packet/nsmfm_packet.cpp"
 
-NSMFM_MAIN_SRCS="$NSMFM_SRCDIR/main/ngx_stream_minecraft_forward_module.cpp"
+NSMFM_MAIN_SRCS="$NSMFM_SRCDIR/main/nsmfm.cpp"
 
-NSMFM_PREREAD_SRCS="$NSMFM_SRCDIR/preread/ngx_stream_minecraft_forward_preread_module.cpp \
+NSMFM_PREREAD_SRCS="$NSMFM_SRCDIR/preread/nsmfpm.cpp \
 $NSMFM_SRCDIR/preread/nsmfpm_session.cpp"
 
-NSMFM_FILTER_SRCS="$NSMFM_SRCDIR/filter/ngx_stream_minecraft_forward_content_filter_module.cpp \
+NSMFM_FILTER_SRCS="$NSMFM_SRCDIR/filter/nsmfcfm.cpp \
 $NSMFM_SRCDIR/filter/nsmfcfm_session.cpp"
 
 NSMFM_SRCS="$NSMFM_MAIN_SRCS $NSMFM_PREREAD_SRCS $NSMFM_FILTER_SRCS $NSMFM_DEP_SRCS"

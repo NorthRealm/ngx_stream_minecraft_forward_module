@@ -4,7 +4,7 @@ extern "C"
 #include <ngx_string.h>
 #include <ngx_hash.h>
 #include <ngx_stream.h>
-#include "ngx_stream_minecraft_forward_module.h"
+#include "nsmfm.h"
 }
 
 static void *mainModuleCreateServerConf(ngx_conf_t *cf);
@@ -82,14 +82,14 @@ ngx_module_t ngx_stream_minecraft_forward_module = {
 };
 
 static void *mainModuleCreateServerConf(ngx_conf_t *cf) {
-    ngx_int_t         rc;
-    
     MinecraftForwardModuleServerConf  *conf;
 
     conf = (MinecraftForwardModuleServerConf *)ngx_pcalloc(cf->pool, sizeof(MinecraftForwardModuleServerConf));
     if (!conf) {
         return NULL;
     }
+
+    ngx_int_t  rc;
 
     conf->enabled = NGX_CONF_UNSET;
     conf->disconnect_on_nomatch = NGX_CONF_UNSET;

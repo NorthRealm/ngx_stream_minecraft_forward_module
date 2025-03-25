@@ -2,7 +2,7 @@ extern "C"
 {
 #include <ngx_core.h>
 #include <ngx_stream.h>
-#include "ngx_stream_minecraft_forward_preread_module.h"
+#include "nsmfpm.h"
 }
 #include "nsmfpm_session.hpp"
 
