@@ -22,6 +22,12 @@ defaults:
     shell: bash
 
 
+permissions:
+  packages: read
+  actions: read
+  contents: read
+
+
 jobs:
   compile:
     name: Compile ${{ matrix.nginx_version }} (${{ matrix.os }})
@@ -29,7 +35,7 @@ jobs:
       fail-fast: false
       matrix:
         os: ["ubuntu-22.04", "ubuntu-24.04", "ubuntu-22.04-arm", "ubuntu-24.04-arm"]
-        nginx_version: ["1.21.0", "1.21.4", "1.22.1", "1.23.4", "1.24.0", "1.25.4", "1.25.5", "1.26.2", "1.27.4", "NetherRealmSpigot"]
+        nginx_version: ["1.21.0", "1.21.4", "1.22.1", "1.23.4", "1.24.0", "1.25.4", "1.25.5", "1.26.2", "1.27.4", "NetherRealmSpigot", "nginx"]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: NorthRealm/reusable-actions/ngx_stream_minecraft_forward_module/test@main
