@@ -86,13 +86,15 @@ static ngx_int_t filterHandler(ngx_stream_session_t *s, ngx_chain_t *chain_in, n
 }
 
 static ngx_int_t upstreamContentFilter(ngx_stream_session_t *s, ngx_chain_t *chain_in) {
-    ngx_connection_t  *c;
-    ngx_int_t          rc;
+    ngx_int_t  rc;
 
     PrereadModuleSessionContext  *prereadContext;
     FilterModuleSessionContext   *filterContext;
 
+#if (NGX_DEBUG)
+    ngx_connection_t  *c;
     c = s->connection;
+#endif
 
 #if (NGX_DEBUG)
     ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0, "Response from upstream");
