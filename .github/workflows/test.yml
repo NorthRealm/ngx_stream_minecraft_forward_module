@@ -1,4 +1,4 @@
-name: Compile and test
+name: Test
 
 on:
   push:
@@ -29,8 +29,8 @@ permissions:
 
 
 jobs:
-  compile:
-    name: Compile ${{ matrix.nginx_version }} (${{ matrix.os }})
+  test:
+    name: Test ${{ matrix.nginx_version }} (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
