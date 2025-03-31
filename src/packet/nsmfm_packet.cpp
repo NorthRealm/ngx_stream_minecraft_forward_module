@@ -251,8 +251,9 @@ ngx_int_t MinecraftLoginstart::determinePayload(ngx_stream_session_t *s, u_char 
     ngx_connection_t  *c;
     ngx_int_t          rc;
     
-    int                parsedInt;
-    int                varintLength;
+    int   parsedInt;
+    int   parsedProtocolNumber;
+    int   varintLength;
 
     c = s->connection;
 
@@ -302,11 +303,37 @@ cannot_read_username_string:
     prereadContext->bufpos = *bufpos;
 
     parsedInt = MinecraftVarint::parse(handshake->protocolNumber->bytes, NULL);
+    parsedProtocolNumber = parsedInt;
     loginstart->uuid = new MinecraftString(prereadContext->pool);
     loginstart->uuid->length = MinecraftVarint::create(_MC_UUID_BYTE_LEN_);
 
-    if (parsedInt >= MINECRAFT_1_19_3) {
-        if (parsedInt <= MINECRAFT_1_20_1) {
+    if (parsedProtocolNumber >= MINECRAFT_1_19_2) {
+        if (parsedProtocolNumber == MINECRAFT_1_19_2) {
+            if (!(*bufpos[0])) {
+                (*bufpos)++;
+                goto determine_if_uuid_provided;
+            }
+            (*bufpos)++;
+            (*bufpos) += _MC_LONG_LEN_;
+            
+            parsedInt = MinecraftVarint::parse(*bufpos, &varintLength);
+            if (parsedInt <= 0) {
+                ngx_log_error(NGX_LOG_ALERT, c->log, 0, "Malformed public key length");
+                return NGX_ERROR;
+            }
+            (*bufpos) += varintLength;
+            (*bufpos) += parsedInt;
+            
+            parsedInt = MinecraftVarint::parse(*bufpos, &varintLength);
+            if (parsedInt <= 0) {
+                ngx_log_error(NGX_LOG_ALERT, c->log, 0, "Malformed signature length");
+                return NGX_ERROR;
+            }
+            (*bufpos) += varintLength;
+            (*bufpos) += parsedInt;
+        }
+        if (parsedProtocolNumber <= MINECRAFT_1_20_1) {
+determine_if_uuid_provided:
             if (!(*bufpos[0])) {
                 (*bufpos)++;
                 delete loginstart->uuid;

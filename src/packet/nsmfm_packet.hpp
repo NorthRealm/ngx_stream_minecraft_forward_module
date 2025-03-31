@@ -9,6 +9,7 @@ extern "C"
 #include "nsmfm_varint.hpp"
 
 #define _MC_PORT_LEN_ sizeof(u_short)
+#define _MC_LONG_LEN_ sizeof(long)
 
 #define _MC_HANDSHAKE_PACKET_ID_         0x00
 #define _MC_HANDSHAKE_STATUS_STATE_      1
