@@ -91,10 +91,10 @@ static ngx_int_t upstreamContentFilter(ngx_stream_session_t *s, ngx_chain_t *cha
     PrereadModuleSessionContext  *prereadContext;
     FilterModuleSessionContext   *filterContext;
 
-#if (NGX_DEBUG)
     ngx_connection_t  *c;
     c = s->connection;
-#endif
+
+    c->log->action = (char *)"filtering packets from upstream";
 
 #if (NGX_DEBUG)
     ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0, "Response from upstream");
@@ -139,19 +139,19 @@ static ngx_int_t clientContentFilter(ngx_stream_session_t *s, ngx_chain_t *chain
     FilterModuleSessionContext        *filterContext;
     MinecraftForwardModuleServerConf  *serverConf;
 
-    u_char            dummyPortNumberChar;
-    int               parsedInt;
     int               prefixedOldHandshakeLength;
     MinecraftVarint  *oldHandshakeLength = nullptr;
     MinecraftVarint  *newHandshakeLength = nullptr;
     MinecraftString  *newHostname;
 
-    int            in_buf_len;
-    int            gathered_buf_len;
-    ngx_chain_t   *target_chain_node;
-    int            split_remnant_len;
+    u_char            dummyPortNumberChar;
+    int               parsedInt;
+
+    int            count_buf_len = 0;
+    ngx_chain_t   *target_chain_node = NULL;
+    int            split_remnant_buf_len = 0;
+    ngx_chain_t   *split_remnant_chain = NULL;
     ngx_chain_t   *new_chain;
-    ngx_chain_t   *split_remnant_chain;
     ngx_chain_t  **link_i;
     ngx_chain_t   *append_i;
     ngx_chain_t   *ln;
@@ -220,40 +220,34 @@ static ngx_int_t clientContentFilter(ngx_stream_session_t *s, ngx_chain_t *chain
         1 + prereadContext->handshake->protocolNumber->bytesLength + newHostname->length->bytesLength
         + MinecraftVarint::parse(newHostname->length->bytes, NULL) + _MC_PORT_LEN_ + 1);
 
-    target_chain_node = NULL;
-    in_buf_len = 0;
-    gathered_buf_len = 0;
-
     for (ln = filterContext->in; ln; ln = ln->next) {
-        in_buf_len = ngx_buf_size(ln->buf);
+        int in_buf_len = ngx_buf_size(ln->buf);
 
         if (in_buf_len <= 0) {
             ngx_log_error(NGX_LOG_EMERG, c->log, 0, "negative size of or empty buffer encountered");
             goto filter_failure;
         }
 
-        gathered_buf_len += in_buf_len;
-        if (ln->buf->last_buf) {
-            if (gathered_buf_len < prefixedOldHandshakeLength) {
-                ngx_log_error(NGX_LOG_EMERG, c->log, 0,
-                              "Incomplete chain of buffer. Expected %d, gathered %d",
-                              prefixedOldHandshakeLength, gathered_buf_len);
-                goto filter_failure;
-            }
-        }
+        count_buf_len += in_buf_len;
 
 #if (NGX_DEBUG)
-        ngx_log_debug(NGX_LOG_DEBUG_STREAM, c->log, 0, "gathered_buf_len: %d", gathered_buf_len);
+        ngx_log_debug(NGX_LOG_DEBUG_STREAM, c->log, 0, "count_buf_len: %d", count_buf_len);
 #endif
 
-        if (gathered_buf_len >= prefixedOldHandshakeLength) {
+        if (count_buf_len >= prefixedOldHandshakeLength) {
             target_chain_node = ln;
             break;
         }
     }
 
-    split_remnant_len = gathered_buf_len - prefixedOldHandshakeLength;
-    split_remnant_chain = NULL;
+    if (count_buf_len < prefixedOldHandshakeLength) {
+        ngx_log_error(NGX_LOG_EMERG, c->log, 0,
+                        "Incomplete chain of buffer. Expected %d, gathered %d",
+                        prefixedOldHandshakeLength, count_buf_len);
+        goto filter_failure;
+    }
+
+    split_remnant_buf_len = count_buf_len - prefixedOldHandshakeLength;
 
     new_chain = ngx_chain_get_free_buf(c->pool, &filterContext->free_chain);
     if (!new_chain) {
@@ -299,17 +293,17 @@ static ngx_int_t clientContentFilter(ngx_stream_session_t *s, ngx_chain_t *chain
         prereadContext->handshake->nextState->bytes, prereadContext->handshake->nextState->bytesLength);
 
 #if (NGX_DEBUG)
-    ngx_log_debug1(NGX_LOG_DEBUG_STREAM, c->log, 0, "split_remnant_len: %d", split_remnant_len);
+    ngx_log_debug1(NGX_LOG_DEBUG_STREAM, c->log, 0, "split_remnant_buf_len: %d", split_remnant_buf_len);
 #endif
 
-    if (split_remnant_len > 0) {
+    if (split_remnant_buf_len > 0) {
         split_remnant_chain = ngx_chain_get_free_buf(c->pool, &filterContext->free_chain);
         if (!split_remnant_chain) {
             ngx_log_error(NGX_LOG_EMERG, c->log, 0, "Cannot initialize split remnant chain");
             goto filter_failure;
         }
 
-        split_remnant_chain->buf->pos = (u_char *)ngx_pnalloc(c->pool, split_remnant_len * sizeof(u_char));
+        split_remnant_chain->buf->pos = (u_char *)ngx_pnalloc(c->pool, split_remnant_buf_len * sizeof(u_char));
         if (!split_remnant_chain->buf->pos) {
             ngx_log_error(NGX_LOG_EMERG, c->log, 0, "Cannot initialize split remnant new buf space");
             goto filter_failure;
@@ -317,13 +311,13 @@ static ngx_int_t clientContentFilter(ngx_stream_session_t *s, ngx_chain_t *chain
 
         split_remnant_chain->buf->start = split_remnant_chain->buf->pos;
         split_remnant_chain->buf->last = split_remnant_chain->buf->pos;
-        split_remnant_chain->buf->end = split_remnant_chain->buf->start + split_remnant_len;
+        split_remnant_chain->buf->end = split_remnant_chain->buf->start + split_remnant_buf_len;
         split_remnant_chain->buf->tag = (ngx_buf_tag_t)&ngx_stream_minecraft_forward_content_filter_module;
         split_remnant_chain->buf->memory = 1;
 
         split_remnant_chain->buf->last = ngx_cpymem(split_remnant_chain->buf->pos,
-                                                    target_chain_node->buf->last - split_remnant_len,
-                                                    split_remnant_len);
+                                                    target_chain_node->buf->last - split_remnant_buf_len,
+                                                    split_remnant_buf_len);
     }
 
 #if (NGX_DEBUG)
