@@ -92,9 +92,9 @@ public:
     MinecraftVarint  *nextState;
 
     MinecraftHandshake(ngx_pool_t *pool) : MinecraftPacket(_MC_HANDSHAKE_PACKET_ID_, pool) {
-        this->protocolNumber = NULL;
-        this->serverAddress = NULL;
-        this->nextState = NULL;
+        this->protocolNumber = nullptr;
+        this->serverAddress = nullptr;
+        this->nextState = nullptr;
         this->serverPort = 0;
     }
 
@@ -122,8 +122,8 @@ public:
     MinecraftString  *uuid;
 
     MinecraftLoginstart(ngx_pool_t *pool) : MinecraftPacket(_MC_LOGINSTART_PACKET_ID_, pool) {
-        this->username = NULL;
-        this->uuid = NULL;
+        this->username = nullptr;
+        this->uuid = nullptr;
     }
 
     ~MinecraftLoginstart() {

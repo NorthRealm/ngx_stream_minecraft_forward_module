@@ -49,7 +49,7 @@ ngx_module_t ngx_stream_minecraft_forward_content_filter_module = {
 
 static MinecraftString *getNewHostname(MinecraftForwardModuleServerConf *sconf, u_char *buf, size_t len) {
     if (!sconf || !buf) {
-        return NULL;
+        return nullptr;
     }
 
     u_char           *res;
@@ -57,7 +57,7 @@ static MinecraftString *getNewHostname(MinecraftForwardModuleServerConf *sconf, 
     
     res = (u_char *)ngx_hash_find(&sconf->hostnames, ngx_hash_key(buf, len), buf, len);
     if (!res) {
-        return NULL;
+        return nullptr;
     }
 
     r = new MinecraftString();
