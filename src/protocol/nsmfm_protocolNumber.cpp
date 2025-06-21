@@ -2,6 +2,7 @@
 
 bool isKnownMinecraftProtocolNumber(int var) {
     switch (var) {
+        case MINECRAFT_1_21_6:
         case MINECRAFT_1_21_5:
         case MINECRAFT_1_21_4:
         case MINECRAFT_1_21_3:

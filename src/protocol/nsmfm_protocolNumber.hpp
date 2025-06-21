@@ -98,5 +98,6 @@ bool isKnownMinecraftProtocolNumber(int var);
 #define MINECRAFT_1_21_3 768
 #define MINECRAFT_1_21_4 769
 #define MINECRAFT_1_21_5 770
+#define MINECRAFT_1_21_6 771
 
 #endif
